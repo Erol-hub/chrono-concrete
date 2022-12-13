@@ -1,24 +1,14 @@
 # Table of contents
 
-* [👋 Welcome to A Product](README.md)
+* [👋 Welcome to Project Chrono Concrete](README.md)
 
-## Overview
+## Wiki
 
-* [💡 What we do](overview/what-we-do.md)
-* [✨ Our Features](overview/our-features.md)
-
-## Product Guides
-
-* [📪 Making a post](product-guides/making-a-post.md)
-* [📎 Understanding Projects](product-guides/understanding-projects.md)
-
-## Fundamentals
-
-* [🛠 Getting set up](fundamentals/getting-set-up/README.md)
-  * [📝 Setting permissions](fundamentals/getting-set-up/setting-permissions.md)
-  * [🧑 Inviting Members](fundamentals/getting-set-up/inviting-members.md)
-
-## Use Cases
-
-* [🎨 For Designers](use-cases/for-designers.md)
-* [🖥 For Developers](use-cases/for-developers.md)
+* [💡 Project Overview](wiki/project-overview.md)
+* [✨ Main Components](wiki/main-components.md)
+* [🛠 Installation and Setup](wiki/usage-instructions/README.md)
+  * [☁ Quest Installation and Setup](wiki/usage-instructions/installation-and-setup.md)
+  * [💻 Desktop Installation and Setup](wiki/usage-instructions/installation-and-setup-1.md)
+* [🖱 Usage Instructions](wiki/usage-instructions-1/README.md)
+  * [🖥 Smoothed Particle Hydrodynamics](wiki/usage-instructions-1/smoothed-particle-hydrodynamics.md)
+  * [🎨 Visualization](wiki/usage-instructions-1/visualization.md)
