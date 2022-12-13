@@ -20,8 +20,8 @@ The project wiki is also available [here.](https://project-chrono-concrete-model
 
 ## Usage
 
-> #### :mouse\_three\_button: [Usage Instructions](wiki/usage-instructions-1/)
+> #### :point\_right: [Usage Instructions](wiki/usage-instructions-1/)
 
-> #### :desktop: [Smoothed Particle Hydrodynamics](wiki/usage-instructions-1/smoothed-particle-hydrodynamics.md)
+> #### :keyboard: [Smoothed Particle Hydrodynamics](wiki/usage-instructions-1/smoothed-particle-hydrodynamics.md)
 
 > #### :art: [Visualization](wiki/usage-instructions-1/visualization.md)
