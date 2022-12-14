@@ -110,7 +110,7 @@ Copy example make script, edit, and build Project Chrono
 </strong></code></pre>
 
 * Navigate to the newly copied 'submit\_chrono\_make.sh' file in FileZilla and double-click on it to edit. Change all instances of LastnameFirstname in the file to your appropriate directory and save/upload editted file back to Quest
-* In your SSH client navigate to your User Directory and run the following command
+* In your SSH client navigate to your User Directory and run the following command to submit job
 
 ```
 sbatch submit_chrono_make.sh
@@ -128,14 +128,45 @@ Once the job has completed, proceed to Step 7.
 
 <details>
 
-<summary>Step 8: Compile Project - <em>In Progress</em></summary>
+<summary>Step 7: Verify Installation</summary>
 
-Install CMake version 3.25.0. An installer for the [software is available for free](https://cmake.org/download/).
+Verify proper installation of Chrono-Concrete by running a test job with MPI
 
-* During installation be sure to check for the CMake executable to be included in your Path environmental variable
+* Copy example make script to User Directory, being sure to replace LastnameFirstname with your correct directory name&#x20;
 
-<pre><code><strong>- For Mac: The CMake.app bundle also contains command line tools, you must set appropriate links to use it from the terminal. It is better to install a pure command line version via homebrew (https://brew.sh). After installing the home brew package manager type: brew install cmake in the terminal.
-</strong><strong>- Notes: Any version of CMake version 1.8.2 or newer should work. 
-</strong></code></pre>
+```
+cp /projects/p31861/ExampleScripts/example_submit_mpi.sh /projects/p31861/Users/LastnameFirstname 
+```
+
+* Navigate to the newly copied 'submit\_chrono\_make.sh' file in FileZilla and double-click on it to edit. Change all instances of LastnameFirstname in the file to your appropriate directory and save/upload editted file back to Quest
+* Make an output directory, being sure to replace LastnameFirstname with your correct directory name&#x20;
+
+```
+mkdir /projects/p31861/Users/LastnameFirstname/outdir
+```
+
+* In your SSH client navigate to your User Directory and run the following command to submit job
+
+```
+sbatch example_submit_mpi.sh
+```
+
+You can check the status of your job with the command, being sure to replace NetID with your NetID:
+
+```
+squeue -u NetID
+```
+
+Once the job has completed, open the outlog file in your User Directory and confirm that the simulation ran. Then navigate to the output directory (./outdir/TestJob) and confirm that several .csv files were created.&#x20;
+
+</details>
+
+<details>
+
+<summary>Step 8: Development</summary>
+
+Code within the chrono-concrete directory can be developed as needed and be pushed/pulled to the GitHub. Please read online about how git works so that you ensure you are properly developing with everyone else.&#x20;
+
+You can modify/copy the example .sh scripts and outdir in your User Directory to help your developments.
 
 </details>
