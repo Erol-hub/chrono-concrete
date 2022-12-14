@@ -1,6 +1,6 @@
 # Table of contents
 
-* [👋 Welcome to Project Chrono Concrete](README.md)
+* [Project Chrono Concrete](README.md)
 
 ## Wiki
 
