@@ -122,6 +122,8 @@ You can check the status of your job with the command, being sure to replace Net
 squeue -u NetID
 ```
 
+Once the job has completed, proceed to Step 7.
+
 </details>
 
 <details>
