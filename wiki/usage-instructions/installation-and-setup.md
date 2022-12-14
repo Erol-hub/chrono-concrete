@@ -72,7 +72,7 @@ Copy the SIF file into your User Directory
 
 <details>
 
-<summary>Step 5: Clone Project Chrono</summary>
+<summary>Step 5: Clone Chrono-Concrete</summary>
 
 Clone the Project Chrono GitHub into your User Directory
 
@@ -84,37 +84,23 @@ Clone the Project Chrono GitHub into your User Directory
 * Clone the GitHub project here with the following command
 
 ```
-git clone https://github.com/projectchrono/chrono.git
+git clone https://github.com/Concrete-Chrono-Development/chrono-concrete.git
 ```
 
 * Pull updates to GitHub project
 
 ```
-cd chrono
-git pull https://github.com/projectchrono/chrono.git
+cd chrono-concrete
+git pull https://github.com/Concrete-Chrono-Development/chrono-concrete
+git submodule init​
+git submodule update
 ```
 
 </details>
 
 <details>
 
-<summary>Step 6: Clone Project Chrono Concrete</summary>
-
-Clone the Project Chrono Concrete GitLab into your User Directory
-
-* Clone the GitLab project here with the following command&#x20;
-
-<pre><code><strong>git clone https://gitlab.com/giovanni.diluzio/project-chrono-concrete.git
-</strong></code></pre>
-
-* Enter your GitLab username
-* Enter your GitLab password
-
-</details>
-
-<details>
-
-<summary>Step 7: Build Project Chrono</summary>
+<summary>Step 7: Build Chrono-Concrete</summary>
 
 Copy example make script, edit, and build Project Chrono
 

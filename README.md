@@ -1,4 +1,4 @@
-# Project Chrono Concrete
+# 👋 Welcome to Project Chrono Concrete
 
 ## Welcome
 
