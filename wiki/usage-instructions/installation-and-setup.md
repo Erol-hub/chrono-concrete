@@ -91,7 +91,7 @@ git clone https://github.com/Concrete-Chrono-Development/chrono-concrete.git
 
 ```
 cd chrono-concrete
-git pull https://github.com/Concrete-Chrono-Development/chrono-concrete
+git pull https://github.com/Concrete-Chrono-Development/chrono-concrete.git
 git submodule init​
 git submodule update
 ```
@@ -100,7 +100,7 @@ git submodule update
 
 <details>
 
-<summary>Step 7: Build Chrono-Concrete</summary>
+<summary>Step 6: Build Chrono-Concrete</summary>
 
 Copy example make script, edit, and build Project Chrono
 
