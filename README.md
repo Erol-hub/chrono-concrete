@@ -25,8 +25,3 @@ The project wiki is also available [here.](https://project-chrono-concrete-model
 > #### :keyboard: [Smoothed Particle Hydrodynamics](wiki/usage-instructions-1/smoothed-particle-hydrodynamics.md)
 
 > #### :art: [Visualization](wiki/usage-instructions-1/visualization.md)
-
-<table data-view="cards"><thead><tr><th></th><th></th><th></th></tr></thead><tbody><tr><td></td><td>fds</td><td></td></tr><tr><td></td><td>fds</td><td></td></tr><tr><td></td><td>fds</td><td></td></tr></tbody></table>
-
-<figure><img src="https://images.unsplash.com/photo-1668595472892-57a348e65858?crop=entropy&#x26;cs=tinysrgb&#x26;fm=jpg&#x26;ixid=MnwxOTcwMjR8MHwxfHJhbmRvbXx8fHx8fHx8fDE2NzEwMzQyNTA&#x26;ixlib=rb-4.0.3&#x26;q=80" alt=""><figcaption></figcaption></figure>
-
