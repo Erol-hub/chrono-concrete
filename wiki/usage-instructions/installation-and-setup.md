@@ -169,4 +169,6 @@ Code within the chrono-concrete directory can be developed as needed and be push
 
 You can modify/copy the example .sh scripts and outdir in your User Directory to help your developments.
 
+Please **do not** edit any files outside of your User Directory.
+
 </details>
