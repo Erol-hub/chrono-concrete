@@ -14,7 +14,7 @@ Install an SSH Client
   * Enter '**quest.northwestern.edu**' for Host Name
   * Enter '**22**' for Port&#x20;
   * Enter '**Quest**' for Saved Sessions
-  * Click _**Save**_
+  * Click **Save**
   * Click **Quest** which should not be added to the Session list
   * Click **Open**
 * A new SSH window will open. In this window login with your Northwestern NetID and password
@@ -63,7 +63,7 @@ Create a directory for all of your developments and testing. No files/folders sh
 
 Copy the SIF file into your User Directory
 
-* In the SSH window run the following command, being sure to replace LastnameFirstname with your correct directory name
+* In the SSH window run the following command, being sure to replace **LastnameFirstname** with your correct directory name
 
 <pre><code><strong>cp /projects/p31861/SingularityContainer/project-chrono-dependencies.sif /projects/p31861/Users/LastnameFirstname 
 </strong></code></pre>
@@ -76,7 +76,7 @@ Copy the SIF file into your User Directory
 
 Clone the Project Chrono GitHub into your User Directory
 
-* In the SSH window cd into your User Directory with the following command, being sure to replace LastnameFirstname with your correct directory name&#x20;
+* In the SSH window cd into your User Directory with the following command, being sure to replace **LastnameFirstname** with your correct directory name&#x20;
 
 <pre><code><strong>cd /projects/p31861/Users/LastnameFirstname
 </strong></code></pre>
@@ -104,19 +104,19 @@ git submodule update
 
 Copy example make script, edit, and build Project Chrono
 
-* Copy example make script to User Directory, being sure to replace LastnameFirstname with your correct directory name&#x20;
+* Copy example make script to User Directory, being sure to replace **LastnameFirstname** with your correct directory name&#x20;
 
 <pre><code><strong>cp /projects/p31861/ExampleScripts/submit_chrono_make.sh /projects/p31861/Users/LastnameFirstname 
 </strong></code></pre>
 
-* Navigate to the newly copied 'submit\_chrono\_make.sh' file in FileZilla and double-click on it to edit. Change all instances of LastnameFirstname in the file to your appropriate directory and save/upload editted file back to Quest
+* Navigate to the newly copied 'submit\_chrono\_make.sh' file in FileZilla and double-click on it to edit. Change all instances of **LastnameFirstname** in the file to your appropriate directory and save/upload editted file back to Quest
 * In your SSH client navigate to your User Directory and run the following command to submit job
 
 ```
 sbatch submit_chrono_make.sh
 ```
 
-You can check the status of your job with the command, being sure to replace NetID with your NetID:
+You can check the status of your job with the command, being sure to replace **NetID** with your NetID:
 
 ```
 squeue -u NetID
@@ -132,14 +132,14 @@ Once the job has completed, proceed to Step 7.
 
 Verify proper installation of Chrono-Concrete by running a test job with MPI
 
-* Copy example make script to User Directory, being sure to replace LastnameFirstname with your correct directory name&#x20;
+* Copy example make script to User Directory, being sure to replace **LastnameFirstname** with your correct directory name&#x20;
 
 ```
 cp /projects/p31861/ExampleScripts/example_submit_mpi.sh /projects/p31861/Users/LastnameFirstname 
 ```
 
-* Navigate to the newly copied 'submit\_chrono\_make.sh' file in FileZilla and double-click on it to edit. Change all instances of LastnameFirstname in the file to your appropriate directory and save/upload editted file back to Quest
-* Make an output directory, being sure to replace LastnameFirstname with your correct directory name&#x20;
+* Navigate to the newly copied 'submit\_chrono\_make.sh' file in FileZilla and double-click on it to edit. Change all instances of **LastnameFirstname** in the file to your appropriate directory and save/upload editted file back to Quest
+* Make an output directory, being sure to replace **LastnameFirstname** with your correct directory name&#x20;
 
 ```
 mkdir /projects/p31861/Users/LastnameFirstname/outdir
@@ -151,7 +151,7 @@ mkdir /projects/p31861/Users/LastnameFirstname/outdir
 sbatch example_submit_mpi.sh
 ```
 
-You can check the status of your job with the command, being sure to replace NetID with your NetID:
+You can check the status of your job with the command, being sure to replace **NetID** with your NetID:
 
 ```
 squeue -u NetID
