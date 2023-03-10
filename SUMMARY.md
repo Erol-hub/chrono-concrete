@@ -10,3 +10,4 @@
   * [Error Fixes](wiki/usage-instructions/error-fixes.md)
 * [🖱 Examples](wiki/examples/README.md)
   * [Example 1: Simple DEM Ball Drop](wiki/examples/example-1-simple-dem-ball-drop.md)
+  * [Example 2: Simple SPH Drop and Impact](wiki/examples/example-1-simple-dem-ball-drop-1.md)
