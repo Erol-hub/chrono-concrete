@@ -20,7 +20,7 @@ All examples are written assuming the user is on Quest and has configured the sy
 
 > #### [Example 1: Simple DEM Ball Drop](wiki/examples/example-1-simple-dem-ball-drop.md) (Core/Multicore Modules: Runs on CPU)
 >
-> #### [Example 2: SPH Drop + Projectile](wiki/examples/example-1-simple-dem-ball-drop-1.md) (GPU Module: Runs on GPU)&#x20;
+> #### [Example 2: DEM Drop + Projectile](wiki/examples/example-1-simple-dem-ball-drop-1.md) (GPU Module: Runs on GPU)&#x20;
 
 ## Error Fixes
 

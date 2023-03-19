@@ -1,8 +1,8 @@
-# Example 2: Simple SPH Drop and Impact
+# Example 2: Simple DEM Drop and Impact
 
 Follow the below instructions to compile and run a basic Project Chrono project on Quest. These instructions assume that you have a Northwestern **NetID** and access to the group project allocation **p31861**.&#x20;
 
-This project will build and then run dropping a group of SPH particles and then hit them with a spherical projectile.
+This project will build and then run dropping a group of DEM particles and then hit them with a spherical projectile.
 
 <figure><img src="../../.gitbook/assets/Example2.png" alt=""><figcaption><p>Snapshot from Example 2 rendering in Paraview</p></figcaption></figure>
 
