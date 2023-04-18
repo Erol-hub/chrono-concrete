@@ -1,8 +1,10 @@
 # ☁ Quest Installation and Setup
 
-Follow the below instructions to get set up with Project Chrono on Quest. These instructions assume that you have a Northwestern **NetID** and access to the group project allocation **p31861**. If you do not have either of these, please contact Matthew Troemner at [mtroemner@gmail.com](https://app.gitbook.com/u/xUYe9ATU96ZtZ44QEt0NAkdxV922).
+Follow the below instructions to get set up with Project Chrono on Quest. These instructions assume that you have a Northwestern **NetID** and access to the group project allocation **p31861**. If you do not have either of these, please contact Matthew Troemner at [mtroemner@gmail.com](http://localhost:5000/u/xUYe9ATU96ZtZ44QEt0NAkdxV922).
 
-Important Note: When following these instructions, if you encounter errors, please try manually typing in the commands rather than copying them from your browser window.
+Note 1: You may also have access to the Northwestern group Buy-in node **b1187**. This node can be used the same as with the generic project allocation; just swap p31861 for b1187. Even if using the buy-in node, you should still store files within the project directory though. Additionally, remember that if running on the buy-in node, you will be limited to requesting the number of processors that are physically located on that node.
+
+Note 2: When following these instructions, if you encounter errors, please try manually typing in the commands rather than copying them from your browser window.
 
 <details>
 
