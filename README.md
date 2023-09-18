@@ -292,17 +292,15 @@ Source for many of these instructions is Project Chrono documentation. More deta
 
 ## Wiki, Details, and Examples
 
-All examples, details, and examples are available on the GitHub Wiki which is located at the Wiki tabe at the top of this page
+All examples, details, and examples are available on the GitHub Wiki which is located at the Wiki tabe at the top of this page, or you can access it at the link below:
 
-> #### [Example 1: Simple DEM Ball Drop](wiki/examples/example-1-simple-dem-ball-drop.md) (Core/Multicore Modules: Runs on CPU)
->
-> #### [Example 2: DEM Drop + Projectile](wiki/examples/example-1-simple-dem-ball-drop-1.md) (GPU Module: Runs on GPU)&#x20;
+> #### [Chrono Concrete Wiki](https://github.com/Concrete-Chrono-Development/chrono-concrete/wiki)
 
 ## Error Fixes
 
-A list of common errors and their fixes are available at the below page. If you encounter an error and find a solution to it, please include it on this page.
+A list of common errors and their fixes are available on the Wiki at the below page. If you encounter an error and find a solution to it, please include it on this page.
 
-> #### [Error Fixes](./#error-fixes)
+> #### [Wiki Error Fixes](https://github.com/Concrete-Chrono-Development/chrono-concrete/wiki)
 
 ## License
 
