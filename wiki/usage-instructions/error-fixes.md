@@ -1,3 +1,0 @@
-# Error Fixes
-
-No found errors and fixes yet...
