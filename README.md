@@ -4,8 +4,6 @@
 
 This is a GitLab repository for the development and implementation of concrete modeling codes in the [Project Chrono](https://www.projectchrono.org) software. The repository and wiki are in development and may be incomplete or include mistakes.
 
-The project wiki is also available [here.](https://project-chrono-concrete-modeling.gitbook.io/project-chrono-concrete-modeling/)
-
 ## Installation and Setup
 
 Select below instructions for installation and setup on Northwestern's Quest HPC system or local desktop. Note that Quest is the preferred platform and desktop instructions are incomplete at this time.
@@ -14,9 +12,9 @@ Select below instructions for installation and setup on Northwestern's Quest HPC
 
 > #### :computer: [Desktop Deployment](wiki/usage-instructions/installation-and-setup-1.md)
 
-## Examples
+## Wiki, Details, and Examples
 
-All examples are written assuming the user is on Quest and has configured the system as outlined in Quest Deployment.
+All examples, details, and examples are available on the GitHub Wiki which is located at the Wiki tabe at the top of this page
 
 > #### [Example 1: Simple DEM Ball Drop](wiki/examples/example-1-simple-dem-ball-drop.md) (Core/Multicore Modules: Runs on CPU)
 >
