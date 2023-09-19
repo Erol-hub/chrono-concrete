@@ -34,6 +34,8 @@ double ChFunction::Get_y_dN(double x, int derivate) const {
             return Get_y_dx(x);
         case 2:
             return Get_y_dxdx(x);
+        case 3:
+            return Get_y_dxdxdx(x);
         default:
             return Get_y(x);
     }
@@ -107,13 +109,13 @@ double ChFunction::Compute_int(double xmin, double xmax, double sampling_step, i
     return mret;
 }
 
-void ChFunction::ArchiveOUT(ChArchiveOut& marchive) {
+void ChFunction::ArchiveOut(ChArchiveOut& marchive) {
     // version number
     marchive.VersionWrite<ChFunction>();
 }
 
 /// Method to allow de serialization of transient data from archives.
-void ChFunction::ArchiveIN(ChArchiveIn& marchive) {
+void ChFunction::ArchiveIn(ChArchiveIn& marchive) {
     // version number
     /*int version =*/ marchive.VersionRead<ChFunction>();
 }
@@ -192,6 +194,19 @@ int ChFunction::FileAsciiPairsSave(ChStreamOutAscii& m_file, double mxmin, doubl
         mX += period;
     }
     return 1;
+}
+
+void ChFunction::EvaluateIntervaldN(ChMatrixDynamic<>& data, double xmin, double xmax, double step, int der) {
+    int num_samples = (xmax - xmin) / step;
+    data.resize(num_samples, der + 2); // data = [x, y(x), y_dx(x), ...]
+    double x = xmin;
+    for (int i = 0; i < num_samples; ++i) {
+        data(i, 0) = x;
+        for (int j = 0; j < der + 1; ++j) {
+            data(i, j + 1) = Get_y_dN(x, j);
+        }
+        x += step;
+    }
 }
 
 }  // end namespace chrono

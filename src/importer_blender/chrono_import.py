@@ -8,7 +8,7 @@
 # - open Blender
 # - menu "Edit/Preferences..", go to tab "Add-ons", press "Install" button and select 
 #   this .py file
-# - check that the Chorno Import add-on is now available in the list, and it is enabled
+# - check that the Chrono Import add-on is now available in the list, and it is enabled
 #
 # To use it: 
 # - check that you built the c++ Chrono with the POSTPROCESS module enabled (if you use
@@ -47,9 +47,9 @@ bl_info = {
     "location": "File > Import-Export",
     "description": "Import ProjectChrono simulations",
     "author": "Alessandro Tasora",
-    "version": (0, 0, 2),
-    "wiki_url": "http://projectchrono.org",
-    "doc_url": "http://projectchrono.org",
+    "version": (0, 0, 3),
+    "wiki_url": "https://api.projectchrono.org/development/introduction_chrono_blender.html",
+    "doc_url": "https://api.projectchrono.org/development/introduction_chrono_blender.html",
 }
 
 import bpy
@@ -86,7 +86,6 @@ chrono_frame_images = []
 chrono_cameras = None
 empty_mesh = None
 chrono_csys = None
-chrono_filename = None
 chrono_view_asset_csys = False
 chrono_view_asset_csys_size = 0.15
 chrono_view_item_csys = False
@@ -1227,7 +1226,7 @@ def update_camera_coordinates(mname,mpos,mrot):
 #
 
 def callback_post(self):
-
+    #print("dbg0")
     scene = bpy.context.scene
     cFrame = scene.frame_current
     sFrame = scene.frame_start
@@ -1242,7 +1241,6 @@ def callback_post(self):
     global chrono_cameras
     global chrono_csys
     global empty_mesh
-    global chrono_filename
     global chrono_view_asset_csys
     global chrono_view_asset_csys_size
     global chrono_view_item_csys
@@ -1259,11 +1257,8 @@ def callback_post(self):
     chrono_cameras = bpy.data.collections.get('chrono_cameras')
     
     chrono_gui_doupdate = False
-    
+
     if (chrono_assets and chrono_frame_objects and chrono_frame_assets):
-        
-        # retrieve filename of last import, in case this was a saved Blender project
-        chrono_filename = chrono_assets['chrono_filename'] 
         
         # delete all things in chrono_frame_objects collection
         for obj in chrono_frame_objects.objects:
@@ -1303,17 +1298,24 @@ def callback_post(self):
         while orphan_node_groups:
             bpy.data.node_groups.remove(orphan_node_groups.pop())
         
-        # load state file, that will fill the chrono_frame_objects and (if necessary) 
+        # Load state file, that will fill the chrono_frame_objects and (if necessary) 
         # the chrono_frame_assets collections
+        # This for loop may be run more than once if one has imported multiple projects
+        # with the "merge" feature, that can be used for cosimulation / parallel stuff
         
-        proj_dir = os.path.dirname(os.path.abspath(chrono_filename))
-        filename = os.path.join(proj_dir, 'output', 'state'+'{:05d}'.format(cFrame)+'.py')
-        
-        if os.path.exists(filename):
-            f = open(filename, "rb")
-            exec(compile(f.read(), filename, 'exec'))
-            f.close()
+        for fileitem in scene.chrono_filenames:
             
+            # Retrieve filename
+            chrono_filename = fileitem.filename
+            
+            proj_dir = os.path.dirname(os.path.abspath(chrono_filename))
+            filename = os.path.join(proj_dir, 'output', 'state'+'{:05d}'.format(cFrame)+'.py')
+            
+            if os.path.exists(filename):
+                f = open(filename, "rb")
+                exec(compile(f.read(), filename, 'exec'))
+                f.close()
+                
         # in case something was added to chrono_frame_assets, make it invisible 
         for masset in chrono_frame_assets.objects:
             masset.hide_set(True) # not masset.hide_viewport = True otherwise also instances are invisible
@@ -1331,7 +1333,7 @@ def callback_post(self):
 # LOAD ASSETS (NON MUTABLE)
 #
     
-def read_chrono_simulation(context, filepath, setting_materials):
+def read_chrono_simulation(context, filepath, setting_materials, setting_merge):
     print("Loading Chrono simulation...")
     
     # PREPARE SCENE
@@ -1345,7 +1347,6 @@ def read_chrono_simulation(context, filepath, setting_materials):
     global chrono_cameras
     global chrono_csys
     global empty_mesh
-    global chrono_filename
     global chrono_view_asset_csys
     global chrono_view_asset_csys_size
     global chrono_view_item_csys
@@ -1355,6 +1356,9 @@ def read_chrono_simulation(context, filepath, setting_materials):
     global chrono_view_materials
     global chrono_view_contacts
     global chrono_gui_doupdate
+    
+    # (this is needed to avoid crashes when pressing F12 for rendering)
+    bpy.context.scene.render.use_lock_interface = True
 
     # disable Chrono GUI update, for performance when changing properties calling Update(), will be re-enabled at the end of this 
     chrono_gui_doupdate = False
@@ -1369,36 +1373,56 @@ def read_chrono_simulation(context, filepath, setting_materials):
     if not chrono_cameras:
         chrono_cameras = bpy.data.collections.new('chrono_cameras')
         bpy.context.scene.collection.children.link(chrono_cameras)
-    for obj in chrono_cameras.objects:
-            bpy.data.objects.remove(obj, do_unlink=True)
             
     chrono_assets = bpy.data.collections.get('chrono_assets')
     if not chrono_assets:
         chrono_assets = bpy.data.collections.new('chrono_assets')
         bpy.context.scene.collection.children.link(chrono_assets)
-    for obj in chrono_assets.objects:
-            bpy.data.objects.remove(obj, do_unlink=True)
-            
-    chrono_assets.hide_render = True
-    #chrono_assets.hide_viewport = True
-    
+        
     chrono_frame_assets = bpy.data.collections.get('chrono_frame_assets')
     if not chrono_frame_assets:
         chrono_frame_assets = bpy.data.collections.new('chrono_frame_assets')
         bpy.context.scene.collection.children.link(chrono_frame_assets)
-    for obj in chrono_frame_assets.objects:
-            bpy.data.objects.remove(obj, do_unlink=True)
-            
-    chrono_frame_assets.hide_render = True
-    #chrono_frame_assets.hide_viewport = True
-            
+              
     chrono_frame_objects = bpy.data.collections.get('chrono_frame_objects')
     if not chrono_frame_objects:
         chrono_frame_objects = bpy.data.collections.new('chrono_frame_objects')
         bpy.context.scene.collection.children.link(chrono_frame_objects)
-    for obj in chrono_frame_objects.objects:
+
+            
+    chrono_assets.hide_render = True
+    chrono_frame_assets.hide_render = True
+    
+    
+    # DELETE OLD OBJECTS (if not merging)
+    
+    if not setting_merge:
+        
+        for obj in chrono_cameras.objects:
             bpy.data.objects.remove(obj, do_unlink=True)
             
+        for obj in chrono_assets.objects:
+            bpy.data.objects.remove(obj, do_unlink=True)
+            
+        for obj in chrono_frame_assets.objects:
+            bpy.data.objects.remove(obj, do_unlink=True)
+            
+        for obj in chrono_frame_objects.objects:
+            bpy.data.objects.remove(obj, do_unlink=True)
+            
+        # remove materials added as per-frame materials    
+        for mmat in chrono_frame_materials:
+            bpy.data.materials.remove(mmat)
+        chrono_frame_materials = [] # empty list
+        
+        # remove materials added as immutable materials    
+        for mmat in chrono_materials:
+            bpy.data.materials.remove(mmat)
+        chrono_materials = [] # empty list
+    
+    
+    # CLEANUP orphaned data, if any
+    
     orphan_mesh = [m for m in bpy.data.meshes if not m.users]
     while orphan_mesh:
         bpy.data.meshes.remove(orphan_mesh.pop())
@@ -1406,15 +1430,6 @@ def read_chrono_simulation(context, filepath, setting_materials):
     orphan_particles = [m for m in bpy.data.particles if not m.users]
     while orphan_particles:
         bpy.data.particles.remove(orphan_particles.pop())
-
-    # remove materials added as per-frame materials    
-    for mmat in chrono_frame_materials:
-        bpy.data.materials.remove(mmat)
-    chrono_frame_materials = [] # empty list
-    # remove materials added as immutable materials    
-    for mmat in chrono_materials:
-        bpy.data.materials.remove(mmat)
-    chrono_materials = [] # empty list
     
     # remove all orphan materials (maybe too aggressive ?)
     #orphan_materials = [m for m in bpy.data.materials if not m.users]
@@ -1522,9 +1537,15 @@ def read_chrono_simulation(context, filepath, setting_materials):
     
     chrono_filename = filepath
     
-    # store filename as custom properties of collection, so that one can save the Blender project,
-    # reopen, and scrub the timeline without the need of doing File/Import/Chrono Import
-    chrono_assets['chrono_filename'] = chrono_filename
+    # Store filename as custom property of scene, so that one can save the Blender project,
+    # reopen, and scrub the timeline without the need of doing File/Import/Chrono Import.
+    # If in merge mode, the filename is appended to a list, so the scrubbing can reload N outputs.
+    
+    if not setting_merge:
+        bpy.context.scene.chrono_filenames.clear()
+        
+    fileitem = bpy.context.scene.chrono_filenames.add()
+    fileitem.filename = chrono_filename
     
     # Load the xxx.assets.py file to create the non-mutable assets 
     # that will fill the chrono_assets collection.
@@ -1801,7 +1822,12 @@ class Chrono_sidebar(Panel):
                         col2.prop(msetting.property[msetting.property_index_width], "max", emboss=False, text="Max")
                         col2.prop(msetting.property[msetting.property_index_width], "colorm", text="Colormap")
 
-                                  
+
+class CUSTOM_filenamesCollection(PropertyGroup):
+    filename: StringProperty(
+        default="",
+        maxlen=1024,  
+    )                                  
   
 class CUSTOM_propertyCollection(PropertyGroup):
     #name: StringProperty() -> Instantiated by default
@@ -1895,6 +1921,7 @@ sidebar_classes = [
     CUSTOM_propertyCollection,
     CUSTOM_meshsettingCollection,
     CUSTOM_glyphsettingCollection,
+    CUSTOM_filenamesCollection,
 ]
 
 
@@ -1933,6 +1960,11 @@ class ImportChrono(Operator, ImportHelper):
         description="Turn off if you want to skip all materials assigned from Chrono side",
         default=True,
     )
+    setting_merge: BoolProperty(
+        name="Merge",
+        description="If true, does not delete last imported Chrono simulation. Useful for merging results from parallel simulations, or cosimulations.",
+        default=False,
+    )
     #    setting_from: IntProperty(
     #        name="from",
     #        description="Initial frame",
@@ -1947,7 +1979,7 @@ class ImportChrono(Operator, ImportHelper):
     #    )
     
     def execute(self, context):
-        return read_chrono_simulation(context, self.filepath, self.setting_materials)
+        return read_chrono_simulation(context, self.filepath, self.setting_materials, self.setting_merge)
 
 
 # Only needed if you want to add into a dynamic menu.
@@ -1961,8 +1993,6 @@ def menu_func_import(self, context):
 
 def register():
     
-    # this is needed to avoid crashes when pressing F12 for rendering  
-    bpy.context.scene.render.use_lock_interface = True
     
     bpy.utils.register_class(ImportChrono)
     bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
@@ -2018,18 +2048,29 @@ def register():
         update=UpdatedFunction
     )
     
-    # Custom scene properties
-    bpy.types.Scene.ch_meshsetting = CollectionProperty(type=CUSTOM_meshsettingCollection, description = "Assets with data attached from Chrono, that can be rendered in falsecolor",)
-    bpy.types.Scene.ch_meshsetting_index = IntProperty()
-
-    bpy.context.scene.ch_meshsetting_index = -1
-    bpy.context.scene.ch_meshsetting.clear()
+    bpy.types.Scene.chrono_filenames = bpy.props.CollectionProperty(
+        type=CUSTOM_filenamesCollection, 
+        description = "Projects exported from Chrono postprocesor",
+    )
     
-    bpy.types.Scene.ch_glyph_setting = CollectionProperty(type=CUSTOM_glyphsettingCollection, description = "Assets with data attached from Chrono, that can be rendered in falsecolor",)
-    bpy.types.Scene.ch_glyph_setting_index = IntProperty()
+    # Custom mesh properties
+    bpy.types.Scene.ch_meshsetting = bpy.props.CollectionProperty(
+        type=CUSTOM_meshsettingCollection, 
+        description = "Assets with data attached from Chrono, that can be rendered in falsecolor",
+    )
+    bpy.types.Scene.ch_meshsetting_index = bpy.props.IntProperty(
+        default = -1
+    )
 
-    bpy.context.scene.ch_glyph_setting_index = -1
-    bpy.context.scene.ch_glyph_setting.clear()
+    # custom glyph properties
+    bpy.types.Scene.ch_glyph_setting = bpy.props.CollectionProperty(
+        type=CUSTOM_glyphsettingCollection, 
+        description = "Assets with data attached from Chrono, that can be rendered in falsecolor",
+    )
+    bpy.types.Scene.ch_glyph_setting_index = bpy.props.IntProperty(
+        default = -1
+    )
+
     
     
     
@@ -2048,6 +2089,7 @@ def unregister():
     del bpy.types.Scene.ch_meshsetting_index 
     del bpy.types.Scene.ch_glyph_setting
     del bpy.types.Scene.ch_glyph_setting_index 
+    del bpy.types.Scene.chrono_filenames
     for c in sidebar_classes:
         bpy.utils.unregister_class(c)
         
@@ -2061,9 +2103,23 @@ def unregister():
     
 
 
+# The following is executed all times one runs this chrono_import.py script in Blender
+# scripting editor: it effectively register the add-on "by hand".
 
 if __name__ == "__main__":
+    
+    # register the add-on just like it was one of the registered add-ons in Edit/preferences...
     register()
 
+    # The following bpy.context.scene.... stuff canNOT be put in register() 
+    # because they give a "Restricted content error", but still can be called
+    # here, i.e. when running this script in the Scripting editor:
+    
+    bpy.context.scene.ch_meshsetting.clear()
+    bpy.context.scene.ch_glyph_setting.clear()
+    
+    # (this is needed to avoid crashes when pressing F12 for rendering)
+    bpy.context.scene.render.use_lock_interface = True
+    
     # TEST: test call
     #bpy.ops.import_chrono.data('INVOKE_DEFAULT')

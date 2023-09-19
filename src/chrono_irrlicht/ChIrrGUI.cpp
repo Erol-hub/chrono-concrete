@@ -56,6 +56,9 @@ bool ChIrrEventReceiver::OnEvent(const irr::SEvent& event) {
             case irr::KEY_KEY_U:
                 m_gui->show_explorer = !m_gui->show_explorer;
                 return true;
+            case irr::KEY_SPACE:
+                m_gui->m_vis->SetUtilityFlag(!m_gui->m_vis->GetUtilityFlag());
+                return true;
             case irr::KEY_F8: {
                 GetLog() << "Saving system in JSON format to dump.json file \n";
                 ChStreamOutAsciiFile mfileo("dump.json");
@@ -381,6 +384,14 @@ void ChIrrGUI::SetModalSpeed(double val) {
     g_modal_speed->setText(irr::core::stringw(message).c_str());
 }
 
+void ChIrrGUI::SetModalModesMax(int maxModes)
+{
+    int newMaxModes = std::max(maxModes, 1);
+    g_modal_mode_n->setMax(newMaxModes);
+    modal_mode_n = std::min(modal_mode_n, newMaxModes);
+    modal_phi = 0.0;
+}
+
 // -----------------------------------------------------------------------------
 
 void ChIrrGUI::DumpSystemMatrices() {
@@ -405,6 +416,8 @@ static void recurse_update_tree_node(ChValue* value, irr::gui::IGUITreeViewNode*
     int ni = 0;
     auto subnode = mnode->getFirstChild();
     for (auto j : mexplorer2.GetFetchResults()) {
+        if (!j->GetRawPtr())
+            continue;
         ++ni;
         if (!subnode) {
             subnode = mnode->addChildBack(L"_to_set_");
@@ -422,24 +435,24 @@ static void recurse_update_tree_node(ChValue* value, irr::gui::IGUITreeViewNode*
             jstr += irr::core::stringw(j->GetClassRegisteredName().c_str());
             jstr += L"] ";
         }
-        if (auto mydouble = j->PointerUpCast<double>()) {
+        if (j->GetTypeid() == std::type_index(typeid(double))) {
             jstr += " =";
-            auto stringval = std::to_string(*mydouble);
+            auto stringval = std::to_string(*static_cast<double*>(j->GetRawPtr()));
             jstr += irr::core::stringw(stringval.c_str());
         }
-        if (auto myfloat = j->PointerUpCast<float>()) {
+        if (j->GetTypeid() == std::type_index(typeid(float))) {
             jstr += " =";
-            auto stringval = std::to_string(*myfloat);
+            auto stringval = std::to_string(*static_cast<float*>(j->GetRawPtr()));
             jstr += irr::core::stringw(stringval.c_str());
         }
-        if (auto myint = j->PointerUpCast<int>()) {
+        if (j->GetTypeid() == std::type_index(typeid(int))) {
             jstr += " =";
-            auto stringval = std::to_string(*myint);
+            auto stringval = std::to_string(*static_cast<int*>(j->GetRawPtr()));
             jstr += irr::core::stringw(stringval.c_str());
         }
-        if (auto mybool = j->PointerUpCast<bool>()) {
+        if (j->GetTypeid() == std::type_index(typeid(bool))) {
             jstr += " =";
-            auto stringval = std::to_string(*mybool);
+            auto stringval = std::to_string(*static_cast<bool*>(j->GetRawPtr()));
             jstr += irr::core::stringw(stringval.c_str());
         }
         subnode->setText(jstr.c_str());

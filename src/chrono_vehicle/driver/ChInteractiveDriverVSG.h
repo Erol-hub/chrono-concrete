@@ -54,6 +54,12 @@ class CH_VEHICLE_API ChInteractiveDriverVSG : public ChInteractiveDriver {
     /// Steering Right
     void SteeringRight();
 
+    /// Increase Clutch
+    void IncreaseClutch();
+
+    /// Decrease Clutch
+    void DecreaseClutch();
+
     /// Center Steering
     void SteeringCenter();
 
@@ -67,4 +73,5 @@ class CH_VEHICLE_API ChInteractiveDriverVSG : public ChInteractiveDriver {
 
 }  // namespace vehicle
 }  // namespace chrono
+
 #endif

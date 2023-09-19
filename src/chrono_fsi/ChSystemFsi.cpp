@@ -76,6 +76,10 @@ ChSystemFsi::ChSystemFsi(ChSystem* sysMBS)
 
 ChSystemFsi::~ChSystemFsi() {}
 
+void ChSystemFsi::AttachSystem(ChSystem* sysMBS) {
+    m_sysMBS = sysMBS;
+}
+
 //--------------------------------------------------------------------------------------------------------------------------------
 
 void ChSystemFsi::InitParams() {
@@ -498,9 +502,9 @@ void ChSystemFsi::ReadParametersFromFile(const std::string& json_file) {
 
 //--------------------------------------------------------------------------------------------------------------------------------
 
-void ChSystemFsi::SetVerbose(bool verb) {
-    m_verbose = verb;
-    m_fsi_interface->m_verbose = verb;
+void ChSystemFsi::SetVerbose(bool verbose) {
+    m_verbose = verbose;
+    m_fsi_interface->m_verbose = verbose;
 }
 
 void ChSystemFsi::SetSPHLinearSolver(SolverType lin_solver) {
@@ -771,6 +775,7 @@ void ChSystemFsi::Initialize() {
         cout << "  HB_k: " << m_paramsH->HB_k << endl;
         cout << "  HB_n: " << m_paramsH->HB_n << endl;
         cout << "  HB_tau0: " << m_paramsH->HB_tau0 << endl;
+        cout << "  Coh_coeff: " << m_paramsH->Coh_coeff << endl;
 
         cout << "  E_young: " << m_paramsH->E_young << endl;
         cout << "  G_shear: " << m_paramsH->G_shear << endl;
@@ -1004,10 +1009,8 @@ void ChSystemFsi::AddSPHParticle(const ChVector<>& point,
                                  const ChVector<>& tauXxYyZz,
                                  const ChVector<>& tauXyXzYz) {
     Real h = m_paramsH->HSML;
-    m_sysFSI->AddSPHParticle(utils::ToReal4(point, h), mR4(rho0, pres0, mu0, -1),
-                             utils::ToReal3(velocity),
-                             utils::ToReal3(tauXxYyZz),
-                             utils::ToReal3(tauXyXzYz));
+    m_sysFSI->AddSPHParticle(utils::ToReal4(point, h), mR4(rho0, pres0, mu0, -1), utils::ToReal3(velocity),
+                             utils::ToReal3(tauXxYyZz), utils::ToReal3(tauXyXzYz));
 }
 
 void ChSystemFsi::AddSPHParticle(const ChVector<>& point,
@@ -1040,20 +1043,22 @@ void ChSystemFsi::AddWallBCE(std::shared_ptr<ChBody> body, const ChFrame<>& fram
     AddBCE(body, bce, frame, false, false, false);
 }
 
-void ChSystemFsi::AddContainerBCE(std::shared_ptr<ChBody> body,
-                                  const ChFrame<>& frame,
-                                  const ChVector<>& size,
-                                  const ChVector<int> faces) {
+void ChSystemFsi::AddBoxContainerBCE(std::shared_ptr<ChBody> body,
+                                     const ChFrame<>& frame,
+                                     const ChVector<>& size,
+                                     const ChVector<int> faces) {
     Real spacing = m_paramsH->MULT_INITSPACE * m_paramsH->HSML;
     Real buffer = 2 * m_paramsH->NUM_BOUNDARY_LAYERS * spacing;
 
+    ChVector<> hsize = size / 2;
+
     // Wall center positions
-    ChVector<> zn(0, 0, -spacing);
-    ChVector<> zp(0, 0, size.z() + spacing);
-    ChVector<> xn(-size.x() / 2 - spacing, 0, size.z() / 2);
-    ChVector<> xp(+size.x() / 2 + spacing, 0, size.z() / 2);
-    ChVector<> yn(0, -size.y() / 2 - spacing, size.z() / 2);
-    ChVector<> yp(0, +size.y() / 2 + spacing, size.z() / 2);
+    ChVector<> xn(-hsize.x() - spacing, 0, 0);
+    ChVector<> xp(+hsize.x() + spacing, 0, 0);
+    ChVector<> yn(0, -hsize.y() - spacing, 0);
+    ChVector<> yp(0, +hsize.y() + spacing, 0);
+    ChVector<> zn(0, 0, -hsize.z() - spacing);
+    ChVector<> zp(0, 0, +hsize.z() + spacing);
 
     // Z- wall
     if (faces.z() == -1 || faces.z() == 2)
@@ -1077,65 +1082,74 @@ void ChSystemFsi::AddContainerBCE(std::shared_ptr<ChBody> body,
         AddWallBCE(body, frame * ChFrame<>(yp, Q_from_AngX(+CH_C_PI_2)), {size.x() + buffer, size.z() + buffer});
 }
 
-void ChSystemFsi::AddBoxBCE(std::shared_ptr<ChBody> body, const ChFrame<>& frame, const ChVector<>& size, bool solid) {
+size_t ChSystemFsi::AddBoxBCE(std::shared_ptr<ChBody> body,
+                              const ChFrame<>& frame,
+                              const ChVector<>& size,
+                              bool solid) {
     thrust::host_vector<Real4> bce;
     CreateBCE_box(utils::ToReal3(size), solid, bce);
     AddBCE(body, bce, frame, solid, false, false);
+    return bce.size();
 }
 
-void ChSystemFsi::AddSphereBCE(std::shared_ptr<ChBody> body,
-                               const ChFrame<>& frame,
-                               double radius,
-                               bool solid,
-                               bool polar) {
+size_t ChSystemFsi::AddSphereBCE(std::shared_ptr<ChBody> body,
+                                 const ChFrame<>& frame,
+                                 double radius,
+                                 bool solid,
+                                 bool polar) {
     thrust::host_vector<Real4> bce;
     CreateBCE_sphere(radius, solid, polar, bce);
     AddBCE(body, bce, frame, solid, false, false);
+    return bce.size();
 }
 
-void ChSystemFsi::AddCylinderBCE(std::shared_ptr<ChBody> body,
-                                 const ChFrame<>& frame,
-                                 double radius,
-                                 double height,
-                                 bool solid,
-                                 bool capped,
-                                 bool polar) {
+size_t ChSystemFsi::AddCylinderBCE(std::shared_ptr<ChBody> body,
+                                   const ChFrame<>& frame,
+                                   double radius,
+                                   double height,
+                                   bool solid,
+                                   bool capped,
+                                   bool polar) {
     thrust::host_vector<Real4> bce;
     CreateBCE_cylinder(radius, height, solid, capped, polar, bce);
     AddBCE(body, bce, frame, solid, false, false);
+    return bce.size();
 }
 
-void ChSystemFsi::AddCylinderAnnulusBCE(std::shared_ptr<ChBody> body,
-                                        const ChFrame<>& frame,
-                                        double radius_inner,
-                                        double radius_outer,
-                                        double height,
-                                        bool polar) {
+size_t ChSystemFsi::AddCylinderAnnulusBCE(std::shared_ptr<ChBody> body,
+                                          const ChFrame<>& frame,
+                                          double radius_inner,
+                                          double radius_outer,
+                                          double height,
+                                          bool polar) {
     thrust::host_vector<Real4> bce;
     CreateBCE_cylinder_annulus(radius_inner, radius_outer, height, polar, bce);
     AddBCE(body, bce, frame, true, false, false);
+    return bce.size();
 }
 
-void ChSystemFsi::AddConeBCE(std::shared_ptr<ChBody> body,
-                             const ChFrame<>& frame,
-                             double radius,
-                             double height,
-                             bool solid,
-                             bool capped,
-                             bool polar) {
+size_t ChSystemFsi::AddConeBCE(std::shared_ptr<ChBody> body,
+                               const ChFrame<>& frame,
+                               double radius,
+                               double height,
+                               bool solid,
+                               bool capped,
+                               bool polar) {
     thrust::host_vector<Real4> bce;
     CreateBCE_cone(radius, height, solid, capped, polar, bce);
     AddBCE(body, bce, frame, solid, false, false);
+    return bce.size();
 }
 
-void ChSystemFsi::AddPointsBCE(std::shared_ptr<ChBody> body,
-                               const std::vector<ChVector<>>& points,
-                               const ChFrame<>& frame,
-                               bool solid) {
+size_t ChSystemFsi::AddPointsBCE(std::shared_ptr<ChBody> body,
+                                 const std::vector<ChVector<>>& points,
+                                 const ChFrame<>& frame,
+                                 bool solid) {
     thrust::host_vector<Real4> bce;
     for (const auto& p : points)
         bce.push_back(mR4(p.x(), p.y(), p.z(), m_paramsH->HSML));
     AddBCE(body, bce, frame, solid, false, false);
+    return bce.size();
 }
 
 //// RADU TODO
@@ -1477,8 +1491,8 @@ void ChSystemFsi::CreateBCE_cylinder(Real rad,
                 for (int iz = 0; iz <= num_layers; iz++) {
                     Real z = hheight - iz * delta_h;
                     bce.push_back(mR4(x, y, -z, kernel_h));
-                    bce.push_back(mR4(x, y, +z, kernel_h));              
-                }                
+                    bce.push_back(mR4(x, y, +z, kernel_h));
+                }
             }
         }
     }
@@ -1857,8 +1871,7 @@ void ChSystemFsi::AddBCE_cable(const thrust::host_vector<Real4>& posRadBCE,
         for (size_t p = 0; p < m_sysFSI->sphMarkersH->posRadH.size() - 1; p++) {
             // Only compare to rigid and flexible BCE particles added previously
             if (m_sysFSI->sphMarkersH->rhoPresMuH[p].w > 0.5) {
-                double dis =
-                    length(mR3(m_sysFSI->sphMarkersH->posRadH[p]) - utils::ToReal3(Correct_Pos));
+                double dis = length(mR3(m_sysFSI->sphMarkersH->posRadH[p]) - utils::ToReal3(Correct_Pos));
                 if (dis < 1e-8) {
                     addthis = false;
                     if (m_verbose)
@@ -1869,8 +1882,7 @@ void ChSystemFsi::AddBCE_cable(const thrust::host_vector<Real4>& posRadBCE,
         }
 
         if (addthis) {
-            m_sysFSI->sphMarkersH->posRadH.push_back(
-                mR4(utils::ToReal3(Correct_Pos), posRadBCE[i].w));
+            m_sysFSI->sphMarkersH->posRadH.push_back(mR4(utils::ToReal3(Correct_Pos), posRadBCE[i].w));
             m_sysFSI->fsiGeneralData->FlexSPH_MeshPos_LRF_H.push_back(utils::ToReal3(pos_natural));
             ChVector<> Correct_Vel = N(0) * nAv + N(1) * nAdirv + N(2) * nBv + N(3) * nBdirv + ChVector<double>(1e-20);
             Real3 v3 = utils::ToReal3(Correct_Vel);
@@ -1935,8 +1947,7 @@ void ChSystemFsi::AddBCE_shell(const thrust::host_vector<Real4>& posRadBCE,
         for (size_t p = 0; p < m_sysFSI->sphMarkersH->posRadH.size() - 1; p++) {
             // Only compare to rigid and flexible BCE particles added previously
             if (m_sysFSI->sphMarkersH->rhoPresMuH[p].w > 0.5) {
-                double dis =
-                    length(mR3(m_sysFSI->sphMarkersH->posRadH[p]) - utils::ToReal3(Correct_Pos));
+                double dis = length(mR3(m_sysFSI->sphMarkersH->posRadH[p]) - utils::ToReal3(Correct_Pos));
                 if (dis < 1e-8) {
                     addthis = false;
                     if (m_verbose)
@@ -1947,8 +1958,7 @@ void ChSystemFsi::AddBCE_shell(const thrust::host_vector<Real4>& posRadBCE,
         }
 
         if (addthis) {
-            m_sysFSI->sphMarkersH->posRadH.push_back(
-                mR4(utils::ToReal3(Correct_Pos), posRadBCE[i].w));
+            m_sysFSI->sphMarkersH->posRadH.push_back(mR4(utils::ToReal3(Correct_Pos), posRadBCE[i].w));
             m_sysFSI->fsiGeneralData->FlexSPH_MeshPos_LRF_H.push_back(utils::ToReal3(pos_natural));
 
             ChVector<> Correct_Vel = N(0) * nAv + N(2) * nBv + N(4) * nCv + N(6) * nDv;
@@ -1968,18 +1978,16 @@ void ChSystemFsi::CreateMeshPoints(geometry::ChTriangleMeshConnected& mesh,
                                    double delta,
                                    std::vector<ChVector<>>& point_cloud) {
     mesh.RepairDuplicateVertexes(1e-9);  // if meshes are not watertight
-    ChVector<> minV;
-    ChVector<> maxV;
-    mesh.GetBoundingBox(minV, maxV, ChMatrix33<>(1));
+    auto bbox = mesh.GetBoundingBox(ChMatrix33<>(1));
 
     const double EPSI = 1e-6;
 
     ChVector<> ray_origin;
-    for (double x = minV.x(); x < maxV.x(); x += delta) {
+    for (double x = bbox.min.x(); x < bbox.max.x(); x += delta) {
         ray_origin.x() = x + 1e-9;
-        for (double y = minV.y(); y < maxV.y(); y += delta) {
+        for (double y = bbox.min.y(); y < bbox.max.y(); y += delta) {
             ray_origin.y() = y + 1e-9;
-            for (double z = minV.z(); z < maxV.z(); z += delta) {
+            for (double z = bbox.min.z(); z < bbox.max.z(); z += delta) {
                 ray_origin.z() = z + 1e-9;
 
                 ChVector<> ray_dir[2] = {ChVector<>(5, 0.5, 0.25), ChVector<>(-3, 0.7, 10)};
@@ -2060,6 +2068,10 @@ double ChSystemFsi::GetKernelLength() const {
 
 double ChSystemFsi::GetInitialSpacing() const {
     return m_paramsH->INITSPACE;
+}
+
+int ChSystemFsi::GetNumBoundaryLayers() const {
+    return m_paramsH->NUM_BOUNDARY_LAYERS;
 }
 
 ChVector<> ChSystemFsi::GetContainerDim() const {

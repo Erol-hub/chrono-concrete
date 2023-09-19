@@ -73,10 +73,12 @@ class FSIStatsVSG : public vsg3d::ChGuiComponentVSG {
   private:
     ChFsiVisualizationVSG* m_vsysFSI;
 };
+
 // -----------------------------------------------------------------------------
 
-ChFsiVisualizationVSG::ChFsiVisualizationVSG(ChSystemFsi* sysFSI) : ChFsiVisualization(sysFSI) {
+ChFsiVisualizationVSG::ChFsiVisualizationVSG(ChSystemFsi* sysFSI, bool verbose) : ChFsiVisualization(sysFSI) {
     m_vsys = new vsg3d::ChVisualSystemVSG();
+    m_vsys->SetVerbose(verbose);
     m_vsys->AttachSystem(m_system);
     m_vsys->SetWindowTitle("");
     m_vsys->SetWindowSize(1280, 720);
@@ -127,6 +129,14 @@ void ChFsiVisualizationVSG::EnableInfoOverlay(bool val) {
     ////m_vsys->EnableStats(val);
 }
 
+void ChFsiVisualizationVSG::SetUseSkyBox(bool val) {
+    m_vsys->SetUseSkyBox(val);
+}
+
+void ChFsiVisualizationVSG::SetClearColor(const ChColor& color) {
+    m_vsys->SetClearColor(color);
+}
+
 void ChFsiVisualizationVSG::Initialize() {
     if (m_sph_markers) {
         m_sph_cloud = chrono_types::make_shared<ChParticleCloud>();
@@ -134,8 +144,7 @@ void ChFsiVisualizationVSG::Initialize() {
         for (int i = 0; i < m_systemFSI->GetNumFluidMarkers(); i++) {
             m_sph_cloud->AddParticle(CSYSNULL);
         }
-        auto sph = chrono_types::make_shared<ChSphereShape>();
-        sph->GetSphereGeometry().rad = m_systemFSI->GetInitialSpacing() / 2;
+        auto sph = chrono_types::make_shared<ChSphereShape>(m_systemFSI->GetInitialSpacing() / 2);
         sph->SetColor(ChColor(0.10f, 0.40f, 0.65f));
         m_sph_cloud->AddVisualShape(sph);
         m_sph_cloud->RegisterColorCallback(m_color_fun);
@@ -148,8 +157,7 @@ void ChFsiVisualizationVSG::Initialize() {
         for (int i = 0; i < m_systemFSI->GetNumBoundaryMarkers(); i++) {
             m_bndry_bce_cloud->AddParticle(CSYSNULL);
         }
-        auto sph = chrono_types::make_shared<ChSphereShape>();
-        sph->GetSphereGeometry().rad = m_systemFSI->GetInitialSpacing() / 4;
+        auto sph = chrono_types::make_shared<ChSphereShape>(m_systemFSI->GetInitialSpacing() / 4);
         sph->SetColor(m_bndry_bce_color);
         m_bndry_bce_cloud->AddVisualShape(sph);
         m_system->Add(m_bndry_bce_cloud);
@@ -161,8 +169,7 @@ void ChFsiVisualizationVSG::Initialize() {
         for (int i = 0; i < m_systemFSI->GetNumRigidBodyMarkers(); i++) {
             m_rigid_bce_cloud->AddParticle(CSYSNULL);
         }
-        auto sph = chrono_types::make_shared<ChSphereShape>();
-        sph->GetSphereGeometry().rad = m_systemFSI->GetInitialSpacing() / 4;
+        auto sph = chrono_types::make_shared<ChSphereShape>(m_systemFSI->GetInitialSpacing() / 4);
         sph->SetColor(m_rigid_bce_color);
         m_rigid_bce_cloud->AddVisualShape(sph);
         m_system->Add(m_rigid_bce_cloud);
@@ -174,8 +181,7 @@ void ChFsiVisualizationVSG::Initialize() {
         for (int i = 0; i < m_systemFSI->GetNumFlexBodyMarkers(); i++) {
             m_flex_bce_cloud->AddParticle(CSYSNULL);
         }
-        auto sph = chrono_types::make_shared<ChSphereShape>();
-        sph->GetSphereGeometry().rad = m_systemFSI->GetInitialSpacing() / 4;
+        auto sph = chrono_types::make_shared<ChSphereShape>(m_systemFSI->GetInitialSpacing() / 4);
         sph->SetColor(m_flex_bce_color);
         m_flex_bce_cloud->AddVisualShape(sph);
         m_system->Add(m_flex_bce_cloud);
@@ -186,6 +192,10 @@ void ChFsiVisualizationVSG::Initialize() {
 
     if (m_user_system)
         m_vsys->AttachSystem(m_user_system);
+
+    m_vsys->SetImageOutput(m_write_images);
+    m_vsys->SetImageOutputDirectory(m_image_dir);
+
     m_vsys->Initialize();
 }
 

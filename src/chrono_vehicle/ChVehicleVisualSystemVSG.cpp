@@ -11,113 +11,33 @@
 //
 // VSG-based visualization wrapper for vehicles.  This class is a derived
 // from ChVisualSystemVSG and provides the following functionality:
-//   - rendering of the entire Irrlicht scene
+//   - rendering of the entire VSG scene
 //   - custom chase-camera (which can be controlled with keyboard)
 //   - optional rendering of links, springs, stats, etc.
 //
 // =============================================================================
 
-#include "chrono_vehicle/powertrain/ChShaftsPowertrain.h"
+#include "chrono_vsg/ChGuiComponentVSG.h"
 
 #include "chrono_vehicle/ChVehicleVisualSystemVSG.h"
-#include "chrono_vsg/ChGuiComponentVSG.h"
 #include "chrono_vehicle/driver/ChInteractiveDriverVSG.h"
+#include "chrono_vehicle/powertrain/ChAutomaticTransmissionShafts.h"
 
 namespace chrono {
 namespace vehicle {
-
-class FindVertexData : public vsg::Visitor {
-  public:
-    void apply(vsg::Object& object) { object.traverse(*this); }
-
-    void apply(vsg::BindVertexBuffers& bvd) {
-        if (bvd.arrays.empty())
-            return;
-        bvd.arrays[0]->data->accept(*this);
-    }
-
-    void apply(vsg::vec3Array& vertices) {
-        if (verticesSet.count(&vertices) == 0) {
-            verticesSet.insert(&vertices);
-        }
-    }
-
-    std::vector<vsg::ref_ptr<vsg::vec3Array>> getVerticesList() {
-        std::vector<vsg::ref_ptr<vsg::vec3Array>> verticesList(verticesSet.size());
-        auto vertices_itr = verticesList.begin();
-        for (auto& vertices : verticesSet) {
-            (*vertices_itr++) = const_cast<vsg::vec3Array*>(vertices);
-        }
-
-        return verticesList;
-    }
-
-    std::set<vsg::vec3Array*> verticesSet;
-};
-
-class FindNormalData : public vsg::Visitor {
-  public:
-    void apply(vsg::Object& object) { object.traverse(*this); }
-
-    void apply(vsg::BindVertexBuffers& bvd) {
-        if (bvd.arrays.empty())
-            return;
-        bvd.arrays[1]->data->accept(*this);
-    }
-
-    void apply(vsg::vec3Array& normals) {
-        if (normalsSet.count(&normals) == 0) {
-            normalsSet.insert(&normals);
-        }
-    }
-
-    std::vector<vsg::ref_ptr<vsg::vec3Array>> getNormalsList() {
-        std::vector<vsg::ref_ptr<vsg::vec3Array>> normalsList(normalsSet.size());
-        auto normals_itr = normalsList.begin();
-        for (auto& normals : normalsSet) {
-            (*normals_itr++) = const_cast<vsg::vec3Array*>(normals);
-        }
-
-        return normalsList;
-    }
-
-    std::set<vsg::vec3Array*> normalsSet;
-};
-
-class FindColorData : public vsg::Visitor {
-  public:
-    void apply(vsg::Object& object) { object.traverse(*this); }
-
-    void apply(vsg::BindVertexBuffers& bvd) {
-        if (bvd.arrays.empty())
-            return;
-        bvd.arrays[3]->data->accept(*this);
-    }
-
-    void apply(vsg::vec4Array& colors) {
-        if (colorsSet.count(&colors) == 0) {
-            colorsSet.insert(&colors);
-        }
-    }
-
-    std::vector<vsg::ref_ptr<vsg::vec4Array>> getColorsList() {
-        std::vector<vsg::ref_ptr<vsg::vec4Array>> colorsList(colorsSet.size());
-        auto colors_itr = colorsList.begin();
-        for (auto& colors : colorsSet) {
-            (*colors_itr++) = const_cast<vsg::vec4Array*>(colors);
-        }
-
-        return colorsList;
-    }
-
-    std::set<vsg::vec4Array*> colorsSet;
-};
 
 // -----------------------------------------------------------------------------
 
 class ChVehicleKeyboardHandlerVSG : public vsg3d::ChEventHandlerVSG {
   public:
-    ChVehicleKeyboardHandlerVSG(ChVehicleVisualSystemVSG* app) : m_app(app) {}
+    ChVehicleKeyboardHandlerVSG(ChVehicleVisualSystemVSG* app)
+        : m_app(app), m_transmission_auto(nullptr), m_transmission_manual(nullptr) {
+        auto transmission = m_app->m_vehicle->GetTransmission();
+        if (transmission) {
+            m_transmission_auto = transmission->asAutomatic();  // nullptr for a manual transmission
+            m_transmission_manual = transmission->asManual();   // nullptr for an automatic transmission
+        }
+    }
 
     // Keyboard events for chase-cam and interactive driver control
     void process(vsg::KeyPressEvent& keyPress) override {
@@ -188,11 +108,58 @@ class ChVehicleKeyboardHandlerVSG : public vsg3d::ChEventHandlerVSG {
             case vsg::KEY_5:
                 m_app->SetChaseCameraState(utils::ChChaseCamera::Free);
                 return;
-       }
+        }
+
+        if (m_transmission_auto) {
+            switch (keyPress.keyBase) {
+                case vsg::KEY_z:
+                    if (m_transmission_auto->GetDriveMode() != ChAutomaticTransmission::DriveMode::FORWARD)
+                        m_transmission_auto->SetDriveMode(ChAutomaticTransmission::DriveMode::FORWARD);
+                    else
+                        m_transmission_auto->SetDriveMode(ChAutomaticTransmission::DriveMode::REVERSE);
+                    return;
+                case vsg::KEY_x:
+                    m_transmission_auto->SetDriveMode(ChAutomaticTransmission::DriveMode::NEUTRAL);
+                    return;
+                case vsg::KEY_t:
+                    if (m_transmission_auto->GetShiftMode() == ChAutomaticTransmission::ShiftMode::MANUAL)
+                        m_transmission_auto->SetShiftMode(ChAutomaticTransmission::ShiftMode::AUTOMATIC);
+                    else
+                        m_transmission_auto->SetShiftMode(ChAutomaticTransmission::ShiftMode::MANUAL);
+                    return;
+                case vsg::KEY_Rightbracket:
+                    m_transmission_auto->ShiftUp();
+                    return;
+                case vsg::KEY_Leftbracket:
+                    m_transmission_auto->ShiftDown();
+                    return;
+            }
+        }
+
+        if (m_transmission_manual) {
+            switch (keyPress.keyBase) {
+                case vsg::KEY_Rightbracket:
+                    m_transmission_manual->ShiftUp();
+                    return;
+                case vsg::KEY_Leftbracket:
+                    m_transmission_manual->ShiftDown();
+                    return;
+                case vsg::KEY_e:
+                    if (m_app->m_driver)
+                        m_app->m_driver->IncreaseClutch();
+                    return;
+                case vsg::KEY_q:
+                    if (m_app->m_driver)
+                        m_app->m_driver->DecreaseClutch();
+                    return;
+            }
+        }
     }
 
   private:
     ChVehicleVisualSystemVSG* m_app;
+    ChAutomaticTransmission* m_transmission_auto;
+    ChManualTransmission* m_transmission_manual;
 };
 
 // -----------------------------------------------------------------------------
@@ -214,9 +181,59 @@ void DrawGauge(float val, float v_min, float v_max) {
     ImGui::PopItemWidth();
 }
 
-void ChVehicleGuiComponentVSG::render() {
-    auto powertrain = m_app->GetVehicle().GetPowertrain();
+void ShowHelp() {
+    if (ImGui::CollapsingHeader("Chase camera controls", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::BulletText("Selection of camera mode");
+        ImGui::Indent();
+        ImGui::Text("1, 2, 3, 4: select camera mode (chase/follow/track/inside)");
+        ImGui::Unindent();
 
+        ImGui::BulletText("'Chase' mode");
+        ImGui::Indent();
+        ImGui::Text("Left/Right: adjust camera chase angle");
+        ImGui::Text("Up/Down: adjust camera chase distance");
+        ImGui::Unindent();
+
+        ImGui::BulletText("'Follow' mode");
+        ImGui::Indent();
+        ImGui::Text("Up/Down: adjust camera chase distance");
+        ImGui::Unindent();
+
+        ImGui::BulletText("'Track' mode");
+        ImGui::BulletText("'Inside' mode");
+        ImGui::Indent();
+        ImGui::Text("no controls available");
+        ImGui::Unindent();
+    }
+
+    if (ImGui::CollapsingHeader("Vehicle controls", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::BulletText("Drive and steering controls");
+        ImGui::Indent();
+        ImGui::Text("W/S: acceleartion/decceleration (combined throttle/brake controls)");
+        ImGui::Text("A/D: steering (left/right)");
+        ImGui::Text("C: center steering wheel (set steering=0)");
+        ImGui::Text("R: release pedals (set throttle=brake=clutch=0)");
+        ImGui::Unindent();
+
+        ImGui::BulletText("Automatic transmission vehicles");
+        ImGui::Indent();
+        ImGui::Text("Z: toggle forward/reverse");
+        ImGui::Text("X: shift to neutral");
+        ImGui::Text("T: toggle manumatic/full automatic mode");
+        ImGui::Text("]: shift up (in manumatic mode)");
+        ImGui::Text("[: shift down (in manumatic mode)");
+        ImGui::Unindent();
+
+        ImGui::BulletText(
+            "Manual transmission vehicles\n(shifting up and down goes from forward gears to neutral and then reverse)");
+        ImGui::Indent();
+        ImGui::Text("]: shift up");
+        ImGui::Text("[: shift down");
+        ImGui::Unindent();
+    }
+}
+
+void ChVehicleGuiComponentVSG::render() {
     char label[64];
     int nstr = sizeof(label) - 1;
 
@@ -234,7 +251,7 @@ void ChVehicleGuiComponentVSG::render() {
     }
 
     ImGui::Spacing();
-    
+
     if (ImGui::BeginTable("VehTable", 2, ImGuiTableFlags_BordersOuter | ImGuiTableFlags_SizingFixedFit,
                           ImVec2(0.0f, 0.0f))) {
         ImGui::TableNextRow();
@@ -254,85 +271,113 @@ void ChVehicleGuiComponentVSG::render() {
         ImGui::PopItemWidth();
         ImGui::TableNextRow();
         ImGui::TableNextColumn();
-        ImGui::Text("Throttle:");
-        ImGui::TableNextColumn();
-        DrawGauge(m_app->GetThrottle(), 0, 1);
-        ImGui::TableNextRow();
-        ImGui::TableNextColumn();
+        if (m_app->GetVehicle().GetPowertrainAssembly() &&
+            m_app->GetVehicle().GetPowertrainAssembly()->GetTransmission()->IsManual()) {
+            ImGui::Text("Clutch:");
+            ImGui::TableNextColumn();
+            DrawGauge(m_app->GetClutch(), 0, 1);
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+        }
         ImGui::Text("Braking:");
         ImGui::TableNextColumn();
         DrawGauge(m_app->GetBraking(), 0, 1);
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        ImGui::Text("Throttle:");
+        ImGui::TableNextColumn();
+        DrawGauge(m_app->GetThrottle(), 0, 1);
         ImGui::EndTable();
     }
 
+    // Display information from powertrain system
+    const auto& powertrain = m_app->GetVehicle().GetPowertrainAssembly();
     if (powertrain) {
+        const auto& engine = powertrain->GetEngine();
+        const auto& transmission = powertrain->GetTransmission();
+
+        auto transmission_auto = transmission->asAutomatic();  // nullptr for a manual transmission
+        auto transmission_manual = transmission->asManual();   // nullptr for an automatic transmission
+
         ImGui::Spacing();
 
-        if (ImGui::BeginTable("PowerTable", 2, ImGuiTableFlags_BordersOuter | ImGuiTableFlags_SizingFixedFit,
+        if (ImGui::BeginTable("Powertrain", 2, ImGuiTableFlags_BordersOuter | ImGuiTableFlags_SizingFixedFit,
                               ImVec2(0.0f, 0.0f))) {
             ImGui::TableNextColumn();
             ImGui::Text("Engine Speed:");
             ImGui::TableNextColumn();
-            snprintf(label, nstr, "%8.1lf RPM", powertrain->GetMotorSpeed() * 30 / CH_C_PI);
+            snprintf(label, nstr, "%8.1lf RPM", engine->GetMotorSpeed() * 30 / CH_C_PI);
             ImGui::Text(label);
             ImGui::TableNextRow();
 
             ImGui::TableNextColumn();
             ImGui::Text("Engine Torque:");
             ImGui::TableNextColumn();
-            snprintf(label, nstr, "%8.1lf Nm", powertrain->GetMotorTorque());
+            snprintf(label, nstr, "%8.1lf Nm", engine->GetOutputMotorshaftTorque());
             ImGui::Text(label);
             ImGui::TableNextRow();
 
             ImGui::TableNextColumn();
-            char tranny_mode =
-                powertrain->GetTransmissionMode() == ChPowertrain::TransmissionMode::AUTOMATIC ? 'A' : 'M';
-            switch (powertrain->GetDriveMode()) {
-                case ChPowertrain::DriveMode::FORWARD:
-                    snprintf(label, nstr, "[%c] Gear forward:", tranny_mode);
-                    break;
-                case ChPowertrain::DriveMode::NEUTRAL:
-                    snprintf(label, nstr, "[%c] Gear neutral:", tranny_mode);
-                    break;
-                case ChPowertrain::DriveMode::REVERSE:
-                    snprintf(label, nstr, "[%c] Gear reverse:", tranny_mode);
-                    break;
+            char shift_mode = 'M';
+            if (transmission->IsAutomatic()) {
+                if (transmission_auto->GetShiftMode() == ChAutomaticTransmission::ShiftMode::AUTOMATIC) {
+                    shift_mode = 'A';
+                }
+                switch (transmission_auto->GetDriveMode()) {
+                    case ChAutomaticTransmission::DriveMode::FORWARD:
+                        snprintf(label, nstr, "[%c] Gear forward:", shift_mode);
+                        break;
+                    case ChAutomaticTransmission::DriveMode::NEUTRAL:
+                        snprintf(label, nstr, "[%c] Gear neutral", shift_mode);
+                        break;
+                    case ChAutomaticTransmission::DriveMode::REVERSE:
+                        snprintf(label, nstr, "[%c] Gear reverse", shift_mode);
+                        break;
+                }
+            }
+            else if (transmission->IsManual()) {
+                snprintf(label, nstr, "[M] Gear:");
             }
             ImGui::Text(label);
             ImGui::TableNextColumn();
-            snprintf(label, nstr, "%d", powertrain->GetCurrentTransmissionGear());
+            if (transmission->IsManual() || (transmission->IsAutomatic() && transmission_auto->GetDriveMode() == ChAutomaticTransmission::DriveMode::FORWARD)) {
+                snprintf(label, nstr, "%d", transmission->GetCurrentGear());
+            }
+            else {
+                snprintf(label, nstr, "");
+            }
             ImGui::Text(label);
             ImGui::TableNextRow();
             ImGui::EndTable();
         }
 
-        if (m_app->m_has_TC) {
+        if (transmission_auto && transmission_auto->HasTorqueConverter()) {
             ImGui::Spacing();
 
-            if (ImGui::BeginTable("ConvTable", 2, ImGuiTableFlags_BordersOuter | ImGuiTableFlags_SizingFixedFit,
+            if (ImGui::BeginTable("TorqueConverter", 2, ImGuiTableFlags_BordersOuter | ImGuiTableFlags_SizingFixedFit,
                                   ImVec2(0.0f, 0.0f))) {
                 ImGui::TableNextColumn();
                 ImGui::Text("T.conv.slip:");
                 ImGui::TableNextColumn();
-                snprintf(label, nstr, "%8.1f", powertrain->GetTorqueConverterSlippage());
+                snprintf(label, nstr, "%8.1f", transmission_auto->GetTorqueConverterSlippage());
                 ImGui::Text(label);
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
                 ImGui::Text("T.conv.torque.in:");
                 ImGui::TableNextColumn();
-                snprintf(label, nstr, "%8.1f Nm", powertrain->GetTorqueConverterInputTorque());
+                snprintf(label, nstr, "%8.1f Nm", transmission_auto->GetTorqueConverterInputTorque());
                 ImGui::Text(label);
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
                 ImGui::Text("T.conv.torque.out:");
                 ImGui::TableNextColumn();
-                snprintf(label, nstr, "%8.1f Nm", powertrain->GetTorqueConverterOutputTorque());
+                snprintf(label, nstr, "%8.1f Nm", transmission_auto->GetTorqueConverterOutputTorque());
                 ImGui::Text(label);
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
                 ImGui::Text("T.conv.speed.out:");
                 ImGui::TableNextColumn();
-                snprintf(label, nstr, "%8.1f RPM", powertrain->GetTorqueConverterOutputSpeed() * 30 / CH_C_PI);
+                snprintf(label, nstr, "%8.1f RPM", transmission_auto->GetTorqueConverterOutputSpeed() * 30 / CH_C_PI);
                 ImGui::Text(label);
                 ImGui::TableNextRow();
                 ImGui::EndTable();
@@ -342,12 +387,26 @@ void ChVehicleGuiComponentVSG::render() {
 
     m_app->AppendGUIStats();
 
+    static bool show_help = false;
+    ImGui::Spacing();
+    ImGui::Checkbox("Vehicle controls help", &show_help);
+
+    if (show_help) {
+        ImGuiIO& io = ImGui::GetIO();
+        ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Always,
+                                ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x * 0.75f, io.DisplaySize.y * 0.75f), ImGuiCond_Always);
+        ImGui::Begin("Help", &show_help, ImGuiWindowFlags_NoCollapse);
+        ShowHelp();
+        ImGui::End();
+    }
+
     ImGui::End();
 }
 
 // -----------------------------------------------------------------------------
 
-ChVehicleVisualSystemVSG::ChVehicleVisualSystemVSG() : ChVisualSystemVSG(), m_driver(nullptr), m_has_TC(false) {}
+ChVehicleVisualSystemVSG::ChVehicleVisualSystemVSG() : ChVisualSystemVSG(), m_driver(nullptr) {}
 
 ChVehicleVisualSystemVSG::~ChVehicleVisualSystemVSG() {}
 
@@ -363,15 +422,6 @@ void ChVehicleVisualSystemVSG::Initialize() {
 
     // Invoke the base Initialize method
     ChVisualSystemVSG::Initialize();
-
-    // Initialize chase-cam mode
-    SetChaseCameraState(utils::ChChaseCamera::State::Chase);
-
-    if (!m_vehicle || !m_vehicle->GetPowertrain())
-        return;
-
-    if (std::dynamic_pointer_cast<ChShaftsPowertrain>(m_vehicle->GetPowertrain()))
-        m_has_TC = true;
 }
 
 void ChVehicleVisualSystemVSG::Advance(double step) {
@@ -384,7 +434,7 @@ void ChVehicleVisualSystemVSG::Advance(double step) {
         t += h;
     }
 
-    // Update the Irrlicht camera
+    // Update the VSG camera
     ChVector<> cam_pos = m_camera->GetCameraPos();
     ChVector<> cam_target = m_camera->GetTargetPos();
     m_vsg_cameraEye.set(cam_pos.x(), cam_pos.y(), cam_pos.z());

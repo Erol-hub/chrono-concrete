@@ -41,7 +41,7 @@ using namespace chrono::vehicle::hmmwv;
 // =============================================================================
 
 // Run-time visualization system (IRRLICHT or VSG)
-ChVisualSystem::Type vis_type = ChVisualSystem::Type::IRRLICHT;
+ChVisualSystem::Type vis_type = ChVisualSystem::Type::VSG;
 
 // Simulation step sizes
 double step_size = 0.005;
@@ -75,7 +75,8 @@ int main(int argc, char* argv[]) {
     // Create and initialize the first vehicle
     HMMWV_Reduced hmmwv_1(&sys);
     hmmwv_1.SetInitPosition(ChCoordsys<>(ChVector<>(0, -1.5, 1.0), QUNIT));
-    hmmwv_1.SetPowertrainType(PowertrainModelType::SIMPLE);
+    hmmwv_1.SetEngineType(EngineModelType::SIMPLE);
+    hmmwv_1.SetTransmissionType(TransmissionModelType::SIMPLE_MAP);
     hmmwv_1.SetDriveType(DrivelineTypeWV::RWD);
     hmmwv_1.SetTireType(TireModelType::RIGID);
     hmmwv_1.Initialize();
@@ -86,18 +87,19 @@ int main(int argc, char* argv[]) {
     hmmwv_1.SetTireVisualizationType(VisualizationType::PRIMITIVES);
 
     std::vector<ChDataDriver::Entry> driver_data_1;
-    driver_data_1.push_back({0.0, 0, 0.0, 0});
-    driver_data_1.push_back({0.5, 0, 0.0, 0});
-    driver_data_1.push_back({0.7, 0.3, 0.7, 0});
-    driver_data_1.push_back({1.0, 0.3, 0.7, 0});
-    driver_data_1.push_back({3.0, 0.5, 0.1, 0});
+    driver_data_1.push_back({0.0, 0.0, 0.0, 0.0, 0.0});
+    driver_data_1.push_back({0.5, 0.0, 0.0, 0.0, 0.0});
+    driver_data_1.push_back({0.7, 0.3, 0.7, 0.0, 0.0});
+    driver_data_1.push_back({1.0, 0.3, 0.7, 0.0, 0.0});
+    driver_data_1.push_back({3.0, 0.5, 0.1, 0.0, 0.0});
     ChDataDriver driver_1(hmmwv_1.GetVehicle(), driver_data_1);
     driver_1.Initialize();
 
     // Create and initialize the second vehicle
     HMMWV_Reduced hmmwv_2(&sys);
     hmmwv_2.SetInitPosition(ChCoordsys<>(ChVector<>(7, 1.5, 1.0), QUNIT));
-    hmmwv_2.SetPowertrainType(PowertrainModelType::SIMPLE);
+    hmmwv_2.SetEngineType(EngineModelType::SIMPLE);
+    hmmwv_2.SetTransmissionType(TransmissionModelType::SIMPLE_MAP);
     hmmwv_2.SetDriveType(DrivelineTypeWV::RWD);
     hmmwv_2.SetTireType(TireModelType::RIGID);
     hmmwv_2.Initialize();
@@ -108,15 +110,25 @@ int main(int argc, char* argv[]) {
     hmmwv_2.SetTireVisualizationType(VisualizationType::PRIMITIVES);
 
     std::vector<ChDataDriver::Entry> driver_data_2;
-    driver_data_2.push_back({0.0, 0, 0.0, 0});
-    driver_data_2.push_back({0.5, 0, 0.0, 0});
-    driver_data_2.push_back({0.7, -0.3, 0.7, 0});
-    driver_data_2.push_back({1.0, -0.3, 0.7, 0});
-    driver_data_2.push_back({3.0, -0.5, 0.1, 0});
+    driver_data_2.push_back({0.0,  0.0, 0.0, 0.0, 0.0});
+    driver_data_2.push_back({0.5,  0.0, 0.0, 0.0, 0.0});
+    driver_data_2.push_back({0.7, -0.3, 0.7, 0.0, 0.0});
+    driver_data_2.push_back({1.0, -0.3, 0.7, 0.0, 0.0});
+    driver_data_2.push_back({3.0, -0.5, 0.1, 0.0, 0.0});
     ChDataDriver driver_2(hmmwv_2.GetVehicle(), driver_data_2);
     driver_2.Initialize();
 
     // Create the vehicle run-time visualization interface and the interactive driver
+
+#ifndef CHRONO_IRRLICHT
+    if (vis_type == ChVisualSystem::Type::IRRLICHT)
+        vis_type = ChVisualSystem::Type::VSG;
+#endif
+#ifndef CHRONO_VSG
+    if (vis_type == ChVisualSystem::Type::VSG)
+        vis_type = ChVisualSystem::Type::IRRLICHT;
+#endif
+
     std::shared_ptr<ChVehicleVisualSystem> vis;
     switch (vis_type) {
         case ChVisualSystem::Type::IRRLICHT: {
@@ -136,6 +148,7 @@ int main(int argc, char* argv[]) {
 #endif
             break;
         }
+        default:
         case ChVisualSystem::Type::VSG: {
 #ifdef CHRONO_VSG
             auto vis_vsg = chrono_types::make_shared<ChWheeledVehicleVisualSystemVSG>();
@@ -161,6 +174,9 @@ int main(int argc, char* argv[]) {
     // ---------------
     // Simulation loop
     // ---------------
+
+    hmmwv_1.GetVehicle().EnableRealtime(true);
+    hmmwv_2.GetVehicle().EnableRealtime(true);
 
     while (vis->Run()) {
         double time = sys.GetChTime();

@@ -1,8 +1,10 @@
 # Demo programs for simulations with models from the Chrono::Robots library
 # ------------------------------------------------------------------------------
 
+message(STATUS "Demo programs for ROBOT models...")
+
 if(NOT ENABLE_MODULE_VEHICLE)
-  message(STATUS "  Warning: the Rover projects require Chrono::Vehicle!")
+  message(STATUS "  Warning: the ROBOT demos require Chrono::Vehicle!")
   return()
 endif()
 
@@ -45,7 +47,7 @@ list(APPEND LIBS "ChronoEngine_vehicle")
 list(APPEND LIBS "ChronoModels_robot")
 
 if(ENABLE_MODULE_IRRLICHT)
-    include_directories(${CH_IRRLICHTINC})
+    include_directories(${CH_IRRLICHT_INCLUDES})
     set(COMPILER_FLAGS "${COMPILER_FLAGS} ${CH_IRRLICHT_CXX_FLAGS}")
     list(APPEND LIBS "ChronoEngine_irrlicht")
     list(APPEND LIBS "ChronoEngine_vehicle_irrlicht")
@@ -84,8 +86,6 @@ endif()
 # ------------------------------------------------------------------------------
 # Add all executables
 # ------------------------------------------------------------------------------
-
-message(STATUS "Demo programs for ROBOT models...")
 
 foreach(PROGRAM ${DEMOS})
     message(STATUS "...add ${PROGRAM}")

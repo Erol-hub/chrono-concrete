@@ -49,12 +49,6 @@ class CH_VEHICLE_API ChPac89Tire : public ChForceElementTire {
     /// Get the name of the vehicle subsystem template.
     virtual std::string GetTemplateName() const override { return "Pac89Tire"; }
 
-    /// Add visualization assets for the rigid tire subsystem.
-    virtual void AddVisualizationAssets(VisualizationType vis) override;
-
-    /// Remove visualization assets for the rigid tire subsystem.
-    virtual void RemoveVisualizationAssets() override;
-
     /// Get the tire radius.
     virtual double GetRadius() const override { return m_states.R_eff; }
 
@@ -68,7 +62,7 @@ class CH_VEHICLE_API ChPac89Tire : public ChForceElementTire {
     virtual double GetDeflection() const override { return m_data.depth; }
 
     /// Get visualization width.
-    virtual double GetVisualizationWidth() const { return m_width; }
+    virtual double GetVisualizationWidth() const override { return m_width; }
 
     /// Get the slip angle used in Pac89 (expressed in radians).
     /// The reported value will have opposite sign to that reported by ChTire::GetSlipAngle
@@ -166,14 +160,6 @@ class CH_VEHICLE_API ChPac89Tire : public ChForceElementTire {
     /// Advance the state of this tire by the specified time step.
     virtual void Advance(double step) override;
 
-    struct ContactData {
-        bool in_contact;      // true if disc in contact with terrain
-        ChCoordsys<> frame;   // contact frame (x: long, y: lat, z: normal)
-        ChVector<> vel;       // relative velocity expressed in contact frame
-        double normal_force;  // magnitude of normal contact force
-        double depth;         // penetration depth
-    };
-
     struct TireStates {
         double cp_long_slip;     // Contact Path - Longitudinal Slip State (Kappa)
         double cp_side_slip;     // Contact Path - Side Slip State (Alpha)
@@ -186,7 +172,6 @@ class CH_VEHICLE_API ChPac89Tire : public ChForceElementTire {
     };
 
     TireStates m_states;
-    std::shared_ptr<ChCylinderShape> m_cyl_shape;  ///< visualization cylinder asset
 };
 
 /// @} vehicle_wheeled_tire

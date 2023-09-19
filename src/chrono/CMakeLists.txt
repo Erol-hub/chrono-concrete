@@ -557,7 +557,6 @@ set(ChronoEngine_geometry_SOURCES
     geometry/ChTriangleMeshConnected.cpp
     geometry/ChRoundedBox.cpp
     geometry/ChRoundedCylinder.cpp
-    geometry/ChRoundedCone.cpp
     geometry/ChSurface.cpp
     geometry/ChSurfaceNurbs.cpp
     geometry/ChVolume.cpp
@@ -587,7 +586,6 @@ set(ChronoEngine_geometry_HEADERS
     geometry/ChTriangleMeshConnected.h
     geometry/ChRoundedBox.h
     geometry/ChRoundedCylinder.h
-    geometry/ChRoundedCone.h
     geometry/ChSurface.h
     geometry/ChSurfaceNurbs.h
     geometry/ChVolume.h
@@ -618,7 +616,6 @@ set(ChronoEngine_assets_SOURCES
     assets/ChGlyphs.cpp
     assets/ChRoundedCylinderShape.cpp
     assets/ChRoundedBoxShape.cpp
-    assets/ChRoundedConeShape.cpp
     assets/ChPathShape.cpp
     assets/ChLineShape.cpp
     assets/ChPointPointShape.cpp
@@ -646,7 +643,6 @@ set(ChronoEngine_assets_HEADERS
     assets/ChGlyphs.h
     assets/ChRoundedCylinderShape.h
     assets/ChRoundedBoxShape.h
-    assets/ChRoundedConeShape.h
     assets/ChPathShape.h
     assets/ChLineShape.h
     assets/ChPointPointShape.h
@@ -741,43 +737,6 @@ source_group(collision FILES
     ${ChronoEngine_collision_SOURCES}
     ${ChronoEngine_collision_HEADERS})
 
-# Edgetempest group
-
-set(ChronoEngine_collision_edgetempest_SOURCES
-    collision/edgetempest/ChCCollisionTree.cpp
-    collision/edgetempest/ChCOBBTree.cpp
-    collision/edgetempest/ChCAABBTree.cpp
-    collision/edgetempest/ChCOBB.cpp
-    collision/edgetempest/ChCAABB.cpp
-    collision/edgetempest/ChCOBBcollider.cpp
-    collision/edgetempest/ChCAABBcollider.cpp
-    collision/edgetempest/ChCNarrowPhaseCollider.cpp
-    collision/edgetempest/ChCGeometryCollider.cpp
-    )
-
-set(ChronoEngine_collision_edgetempest_HEADERS
-    collision/edgetempest/ChCAABB.h
-    collision/edgetempest/ChCAABBcollider.h
-    collision/edgetempest/ChCAABBTree.h
-    collision/edgetempest/ChCAbsoluteAABB.h
-    collision/edgetempest/ChCBroadPhaseCollider.h
-    collision/edgetempest/ChCBruteForce.h
-    collision/edgetempest/ChCCollisionTree.h
-    collision/edgetempest/ChCCompile.h
-    collision/edgetempest/ChCGeometryCollider.h
-    collision/edgetempest/ChCGetTime.h
-    collision/edgetempest/ChCMates.h
-    collision/edgetempest/ChCMatVec.h
-    collision/edgetempest/ChCNarrowPhaseCollider.h
-    collision/edgetempest/ChCOBB.h
-    collision/edgetempest/ChCOBBcollider.h
-    collision/edgetempest/ChCOBBTree.h
-    collision/edgetempest/ChCSweepAndPrune.h
-    )
-
-source_group(collision\\edgetempest FILES
-    ${ChronoEngine_collision_edgetempest_SOURCES}
-    ${ChronoEngine_collision_edgetempest_HEADERS})
 
 # Particle factory group
 
@@ -828,9 +787,12 @@ source_group(timestepper FILES
 
 set(ChronoEngine_motion_functions_SOURCES
     motion_functions/ChFunction_Base.cpp
+	motion_functions/ChFunction_BSpline.cpp
     motion_functions/ChFunction_Const.cpp
     motion_functions/ChFunction_ConstAcc.cpp
+	motion_functions/ChFunction_Cycloidal.cpp
     motion_functions/ChFunction_Derive.cpp
+    motion_functions/ChFunction_DoubleS.cpp
     motion_functions/ChFunction_Fillet3.cpp
     motion_functions/ChFunction_Integrate.cpp
     motion_functions/ChFunction_Matlab.cpp
@@ -863,9 +825,12 @@ set(ChronoEngine_motion_functions_SOURCES
 set(ChronoEngine_motion_functions_HEADERS
     motion_functions/ChFunction.h
     motion_functions/ChFunction_Base.h
+	motion_functions/ChFunction_BSpline.h
     motion_functions/ChFunction_Const.h
     motion_functions/ChFunction_ConstAcc.h
+	motion_functions/ChFunction_Cycloidal.h
     motion_functions/ChFunction_Derive.h
+    motion_functions/ChFunction_DoubleS.h
     motion_functions/ChFunction_Fillet3.h
     motion_functions/ChFunction_Integrate.h
     motion_functions/ChFunction_Matlab.h
@@ -1267,9 +1232,6 @@ set(ChronoEngine_utils_SOURCES
     utils/ChProfiler.cpp
     utils/ChFilters.cpp
     utils/ChCompositeInertia.cpp
-    utils/ChParserOpenSim.cpp
-    utils/ChParserAdams.cpp
-    utils/ChAdamsTokenizer.yy.cpp
     utils/ChConvexHull.cpp
     utils/ChSocket.cpp
     )
@@ -1286,8 +1248,6 @@ set(ChronoEngine_utils_HEADERS
     utils/ChProfiler.h
     utils/ChFilters.h
     utils/ChCompositeInertia.h
-    utils/ChParserOpenSim.h
-    utils/ChParserAdams.h
     utils/ChConvexHull.h
     utils/ChSocket.h
 )
@@ -1310,6 +1270,17 @@ set(ChronoEngine_tiny_obj_FILES
 
 source_group(utils\\tiny_obj FILES
     ${ChronoEngine_tiny_obj_FILES})
+
+# LibSTL Group
+
+set(ChronoEngine_libstl_FILES
+  ../chrono_thirdparty/libstl/stlfile.c
+  ../chrono_thirdparty/libstl/stlfile.h
+)
+
+source_group(utils\\libstl FILES
+    ${ChronoEngine_libstl_FILES})
+
 
 # Collect all source and header files for the ChronoEngine library
 
@@ -1347,8 +1318,6 @@ set(ChronoEngine_FILES
     ${ChronoEngine_geometry_HEADERS}
     ${ChronoEngine_assets_SOURCES}
     ${ChronoEngine_assets_HEADERS}
-    ${ChronoEngine_collision_edgetempest_SOURCES}
-    ${ChronoEngine_collision_edgetempest_HEADERS}
     ${ChronoEngine_collision_convexdecompHACD_SOURCES}
     ${ChronoEngine_collision_convexdecompHACDv2_SOURCES}
     ${ChronoEngine_particlefactory_SOURCES}
@@ -1363,7 +1332,8 @@ set(ChronoEngine_FILES
     ${ChronoEngine_utils_SOURCES}
     ${ChronoEngine_utils_HEADERS}
     ${ChronoEngine_tiny_obj_FILES}
-    )
+    ${ChronoEngine_libstl_FILES}
+)
 
 # Add the 'socket' library to the linking, depending on platform.
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Windows")

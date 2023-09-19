@@ -36,7 +36,7 @@ list(APPEND LIBS "ChronoEngine_vehicle")
 list(APPEND LIBS "ChronoModels_vehicle")
 
 if(ENABLE_MODULE_IRRLICHT)
-    include_directories(${CH_IRRLICHTINC})
+    include_directories(${CH_IRRLICHT_INCLUDES})
     set(COMPILER_FLAGS "${COMPILER_FLAGS} ${CH_IRRLICHT_CXX_FLAGS}")
     list(APPEND LIBS "ChronoEngine_irrlicht")
     list(APPEND LIBS "ChronoEngine_vehicle_irrlicht")
@@ -61,6 +61,10 @@ endif()
 if(ENABLE_MODULE_MUMPS)
     include_directories(${CH_MUMPS_INCLUDES})
     list(APPEND LIBS "ChronoEngine_mumps")
+endif()
+
+if(ENABLE_MODULE_POSTPROCESS)
+    list(APPEND LIBS "ChronoEngine_postprocess")
 endif()
 
 #--------------------------------------------------------------

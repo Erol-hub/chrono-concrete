@@ -26,7 +26,6 @@
 
 #include "chrono/assets/ChVisualSystem.h"
 #include "chrono/assets/ChVisualModel.h"
-#include "chrono/physics/ChLoadContainer.h"
 
 #include "chrono/assets/ChBoxShape.h"
 #include "chrono/assets/ChSphereShape.h"
@@ -40,6 +39,11 @@
 #include "chrono/assets/ChModelFileShape.h"
 #include "chrono/assets/ChLineShape.h"
 #include "chrono/assets/ChPathShape.h"
+
+#include "chrono/physics/ChBody.h"
+#include "chrono/physics/ChLinkMarkers.h"
+#include "chrono/physics/ChLinkMate.h"
+#include "chrono/physics/ChLoadContainer.h"
 #include "chrono/physics/ChParticleCloud.h"
 
 #include "chrono_vsg/ChApiVSG.h"
@@ -67,6 +71,11 @@ class CH_VSG_API ChVisualSystemVSG : virtual public ChVisualSystem {
     /// visualization assets occur.
     virtual void BindAll() override;
 
+    /// Process the visual assets for the specified physics item.
+    /// This function must be called if a new physics item is added to the system or if changes to its visual model
+    /// occur after the call to Initialize().
+    virtual void BindItem(std::shared_ptr<ChPhysicsItem> item) override;
+
     /// Check if rendering is running.
     /// Returns `false` if the viewer was closed.
     virtual bool Run() override;
@@ -87,6 +96,12 @@ class CH_VSG_API ChVisualSystemVSG : virtual public ChVisualSystem {
     void SetCOGFrameScale(double axis_length);
     void ToggleCOGFrameVisibility();
 
+    /// Render joint frames for all links in the system.
+    void RenderJointFrames(double axis_length = 1);
+
+    void SetJointFrameScale(double axis_length);
+    void ToggleJointFrameVisibility();
+
     /// End the scene draw at the end of each animation frame.
     virtual void EndScene() override {}
 
@@ -97,12 +112,12 @@ class CH_VSG_API ChVisualSystemVSG : virtual public ChVisualSystem {
     // Terminate the VSG visualization.
     void Quit();
 
-    void SetWindowSize(ChVector2<int> size);
+    void SetWindowSize(const ChVector2<int>& size);
     void SetWindowSize(int width, int height);
-    void SetWindowPosition(ChVector2<int> pos);
+    void SetWindowPosition(const ChVector2<int>& pos);
     void SetWindowPosition(int from_left, int from_top);
-    void SetWindowTitle(std::string title);
-    void SetClearColor(ChColor color);
+    void SetWindowTitle(const std::string& title);
+    void SetClearColor(const ChColor& color);
     void SetOutputScreen(int screenNum = 0);
     void SetFullscreen(bool yesno = false);
     void SetUseSkyBox(bool yesno);
@@ -137,6 +152,9 @@ class CH_VSG_API ChVisualSystemVSG : virtual public ChVisualSystem {
 
     /// Get estimated FPS.
     double GetRenderingFPS() const { return m_fps; }
+
+    /// Enable/disable VSG information terminal output during initialization (default: true).
+    void SetVerbose(bool verbose) { m_verbose = verbose; }
 
     void SetLightIntensity(float intensity);
     void SetLightDirection(double azimuth, double elevation);
@@ -222,46 +240,69 @@ class CH_VSG_API ChVisualSystemVSG : virtual public ChVisualSystem {
     vsg::ref_ptr<vsg::Group> m_bodyScene;
     vsg::ref_ptr<vsg::Group> m_linkScene;
     vsg::ref_ptr<vsg::Group> m_particleScene;
-    vsg::ref_ptr<vsg::Group> m_decoScene;
     vsg::ref_ptr<vsg::Group> m_deformableScene;
+    vsg::ref_ptr<vsg::Group> m_decoScene;
 
-    vsg::ref_ptr<vsg::Switch> m_cogScene;
+    vsg::ref_ptr<vsg::Switch> m_cogFrameScene;
+    vsg::ref_ptr<vsg::Switch> m_jointFrameScene;
 
     vsg::ref_ptr<vsg::Options> m_options;  ///< I/O related options for vsg::read/write calls
     vsg::ref_ptr<vsg::Builder> m_vsgBuilder;
     vsg::ref_ptr<ShapeBuilder> m_shapeBuilder;
 
-    bool m_wireframe;  ///< draw as wireframes
-
+    bool m_verbose;               ///< VSG terminal initialization output
+    bool m_wireframe;             ///< draw as wireframes
     bool m_capture_image;         ///< export current frame to image file
     std::string m_imageFilename;  ///< name of file to export current frame
 
-    // Infos for deformable soil
-    size_t m_num_vsgVertexList = 0;
-    bool m_allowVertexTransfer = false;
-    bool m_allowNormalsTransfer = false;
-    bool m_allowColorsTransfer = false;
-    std::vector<vsg::ref_ptr<vsg::vec3Array>> m_vsgVerticesList;
-    std::vector<vsg::ref_ptr<vsg::vec3Array>> m_vsgNormalsList;
-    std::vector<vsg::ref_ptr<vsg::vec4Array>> m_vsgColorsList;
-    std::shared_ptr<ChTriangleMeshShape> m_mbsMesh;
+    /// Data related to deformable meshes (FEA and SCM).
+    struct DeformableMesh {
+        std::shared_ptr<geometry::ChTriangleMeshConnected> trimesh;  ///< reference to the Chrono triangle mesh
+        vsg::ref_ptr<vsg::vec3Array> vertices;                       ///< mesh vertices
+        vsg::ref_ptr<vsg::vec3Array> normals;                        ///< mesh normals
+        vsg::ref_ptr<vsg::vec4Array> colors;                         ///< mesh vertex colors
+        bool mesh_soup;                                              ///< true if using separate triangles
+        bool dynamic_vertices;                                       ///< mesh vertices change
+        bool dynamic_normals;                                        ///< mesh normals change
+        bool dynamic_colors;                                         ///< mesh vertex colors change
+    };
+    std::vector<DeformableMesh> m_def_meshes;
 
-    // Data for particle clouds
+    /// Data for particle clouds.
     struct ParticleCloud {
         std::shared_ptr<ChParticleCloud> pcloud;  ///< reference to the Chrono physics item
-        size_t num_particles;                     ///< number of particles in cloud
-        bool dyn_pos;                             ///< if false, no dynamic position update
-        bool dyn_col;                             ///< if false, no dynamic color update
-        int start_pos;                            ///< index in positions list array
-        int start_col;                            ///< index in colors list array
+        vsg::ref_ptr<vsg::vec3Array> positions;   ///< particle positions
+        vsg::ref_ptr<vsg::vec4Array> colors;      ///< particle colors
+        bool dynamic_positions;                   ///< particle positions change
+        bool dynamic_colors;                      ///< particle colors change
     };
-
     std::vector<ParticleCloud> m_clouds;
-    std::vector<vsg::ref_ptr<vsg::vec3Array>> m_cloud_positions;
-    std::vector<vsg::ref_ptr<vsg::vec4Array>> m_cloud_colors;
-    bool m_allowPositionTransfer = false;
 
   private:
+    /// Bind the visual model associated with a body.
+    void BindBody(const std::shared_ptr<ChBody>& body);
+
+    /// Bind the visual model associated with an FEA mesh.
+    void BindMesh(const std::shared_ptr<fea::ChMesh>& mesh);
+
+    /// Bind the visual model assoicated with a particle cloud
+    void BindParticleCloud(const std::shared_ptr<ChParticleCloud>& pcloud);
+
+    /// Bind the visual model associated with a load container.
+    void BindLoadContainer(const std::shared_ptr<ChLoadContainer>& loadcont);
+
+    /// Bind the visual model associated with a TSDA.
+    void BindTSDA(const std::shared_ptr<ChLinkTSDA>& tsda);
+
+    /// Bind the visual asset assoicated with a distance constraint.
+    void BindLinkDistance(const std::shared_ptr<ChLinkDistance>& dist);
+
+    /// Bind the body COG frame.
+    void BindBodyFrame(const std::shared_ptr<ChBody>& body);
+
+    /// Bind the joint frames.
+    void BindLinkFrame(const std::shared_ptr<ChLinkBase>& link);
+
     /// Utility function to populate a VSG group with shape groups (from the given visual model).
     /// The visual model may or may not be associated with a Chrono physics item.
     void PopulateGroup(vsg::ref_ptr<vsg::Group> group,
@@ -292,12 +333,15 @@ class CH_VSG_API ChVisualSystemVSG : virtual public ChVisualSystem {
     double m_azimuth = 0;
     float m_guiFontSize = 20.0f;
 
-    bool m_show_cog;     ///< flag to toggle COG visibility
-    double m_cog_scale;  ///< current COG frame scale
+    bool m_show_cog_frames;    ///< flag to toggle COG frame visibility
+    double m_cog_frame_scale;  ///< current COG frame scale
+
+    bool m_show_joint_frames;    ///< flag to toggle COG frame visibility
+    double m_joint_frame_scale;  ///< current joint frame scale
 
     unsigned int m_frame_number;                      ///< current number of rendered frames
     double m_start_time;                              ///< wallclock time at first render
-    ChTimer<> m_timer_render;                         ///< timer for rendering speed
+    ChTimer m_timer_render;                           ///< timer for rendering speed
     double m_old_time, m_current_time, m_time_total;  ///< render times
     double m_fps;                                     ///< estimated FPS (moving average)
 

@@ -1,7 +1,7 @@
 // =============================================================================
 // PROJECT CHRONO - http://projectchrono.org
 //
-// Copyright (c) 2014 projectchrono.org
+// Copyright (c) 2023 projectchrono.org
 // All rights reserved.
 //
 // Use of this source code is governed by a BSD-style license that can be found
@@ -9,7 +9,7 @@
 // http://projectchrono.org/license-chrono.txt.
 //
 // =============================================================================
-// Authors: Radu Serban
+// Authors: Radu Serban, Rainer Gericke
 // =============================================================================
 //
 // TMsimpleTire tire constructed with data from file (JSON format).
@@ -37,12 +37,11 @@ class CH_VEHICLE_API TMsimpleTire : public ChTMsimpleTire {
     TMsimpleTire(const rapidjson::Document& d);
     ~TMsimpleTire() {}
 
-    virtual double GetNormalStiffnessForce(double depth) const override { return depth*m_Cz; }
-    virtual double GetNormalDampingForce(double depth, double velocity) const override { return velocity*m_Dz; };
-
     virtual void SetTMsimpleParams() override {}
     virtual double GetTireMass() const override { return m_mass; }
     virtual ChVector<> GetTireInertia() const override { return m_inertia; }
+
+    virtual double GetVisualizationWidth() const override { return m_visualization_width; }
 
     virtual void AddVisualizationAssets(VisualizationType vis) override;
     virtual void RemoveVisualizationAssets() override final;
@@ -53,6 +52,7 @@ class CH_VEHICLE_API TMsimpleTire : public ChTMsimpleTire {
     double m_mass;
     ChVector<> m_inertia;
 
+    double m_visualization_width;
     bool m_has_mesh;
     std::string m_meshFile_left;
     std::string m_meshFile_right;
@@ -65,4 +65,3 @@ class CH_VEHICLE_API TMsimpleTire : public ChTMsimpleTire {
 }  // end namespace chrono
 
 #endif
-

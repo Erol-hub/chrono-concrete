@@ -320,7 +320,7 @@ __global__ void UpdateFluidD(Real4* posRadD,
             // Real xi = 1.1;
             Real dia = paramsD.ave_diam;
             Real I0 = paramsD.mu_I0;  // xi*dia*sqrt(rhoPresMu.x);//
-            Real I = Chi * dia * sqrt( paramsD.rho0 / ( p_tr + 1.0e9 ) );
+            Real I = Chi * dia * sqrt( paramsD.rho0 / ( p_tr + 1.0e-9 ) );
 
             Real coh = paramsD.Coh_coeff;
             // Real Chi_cri = 0.1;
@@ -598,9 +598,7 @@ ChFluidDynamics::ChFluidDynamics(std::shared_ptr<ChBce> otherBceWorker,
                 otherBceWorker, fsiSystem.sortedSphMarkersD, fsiSystem.markersProximityD, 
                 fsiSystem.fsiGeneralData, paramsH, numObjectsH, verb);
             if (verbose) {
-                cout << "============================================" << endl;
-                cout << "======   Created an I2SPH framework   ======" << endl;
-                cout << "============================================" << endl;
+                cout << "====== Created an I2SPH framework" << endl;
             }
             break;
 
@@ -609,9 +607,7 @@ ChFluidDynamics::ChFluidDynamics(std::shared_ptr<ChBce> otherBceWorker,
                 otherBceWorker, fsiSystem.sortedSphMarkersD, fsiSystem.markersProximityD,
                 fsiSystem.fsiGeneralData, paramsH, numObjectsH, verb);
             if (verbose) {
-                cout << "============================================" << endl;
-                cout << "======   Created an IISPH framework   ======" << endl;
-                cout << "============================================" << endl;
+                cout << "====== Created an IISPH framework" << endl;
             }
             break;
 
@@ -620,9 +616,7 @@ ChFluidDynamics::ChFluidDynamics(std::shared_ptr<ChBce> otherBceWorker,
                 otherBceWorker, fsiSystem.sortedSphMarkersD, fsiSystem.markersProximityD, 
                 fsiSystem.fsiGeneralData, paramsH, numObjectsH, verb);
             if (verbose) {
-                cout << "============================================" << endl;
-                cout << "======   Created a WCSPH framework   =======" << endl;
-                cout << "============================================" << endl;
+                cout << "====== Created a WCSPH framework" << endl;
             }
             break;
 

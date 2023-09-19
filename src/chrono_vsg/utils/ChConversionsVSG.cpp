@@ -16,16 +16,41 @@
 
 namespace vsg {
 
+vec2CH::vec2CH(const chrono::ChVector2<>& vec) {
+    x = static_cast<float>(vec.x());
+    y = static_cast<float>(vec.y());
+}
+
 vec3CH::vec3CH(const chrono::ChVector<>& vec) {
     x = static_cast<float>(vec.x());
     y = static_cast<float>(vec.y());
     z = static_cast<float>(vec.z());
 }
 
+vec3CH::vec3CH(const chrono::ChColor& col) {
+    x = col.R;
+    y = col.G;
+    z = col.B;
+}
+
 dvec3CH::dvec3CH(const chrono::ChVector<>& vec) {
     x = vec.x();
     y = vec.y();
     z = vec.z();
+}
+
+vec4CH::vec4CH(const chrono::ChVector<>& vec, double w) {
+    x = static_cast<float>(vec.x());
+    y = static_cast<float>(vec.y());
+    z = static_cast<float>(vec.z());
+    w = static_cast<float>(w);
+}
+
+vec4CH::vec4CH(const chrono::ChColor& col, float a) {
+    x = col.R;
+    y = col.G;
+    z = col.B;
+    w = a;
 }
 
 dmat4CH::dmat4CH(const chrono::ChFrame<>& frame, const chrono::ChVector<>& scale) {

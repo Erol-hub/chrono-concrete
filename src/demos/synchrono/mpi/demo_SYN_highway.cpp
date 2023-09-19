@@ -9,7 +9,7 @@
 // http://projectchrono.org/license-chrono.txt.
 //
 // =============================================================================
-// Authors: Yan Xiao
+// Authors: Yan Xiao, Jason Zhou
 // =============================================================================
 //
 // Demo of several vehicles driving on a highway, vehicles follow paths to stay
@@ -36,11 +36,11 @@
 #include "chrono_synchrono/utils/SynLog.h"
 
 #ifdef CHRONO_SENSOR
-#include "chrono_sensor/ChSensorManager.h"
-#include "chrono_sensor/sensors/ChCameraSensor.h"
-#include "chrono_sensor/filters/ChFilterAccess.h"
-#include "chrono_sensor/filters/ChFilterSave.h"
-#include "chrono_sensor/filters/ChFilterVisualize.h"
+    #include "chrono_sensor/ChSensorManager.h"
+    #include "chrono_sensor/sensors/ChCameraSensor.h"
+    #include "chrono_sensor/filters/ChFilterAccess.h"
+    #include "chrono_sensor/filters/ChFilterSave.h"
+    #include "chrono_sensor/filters/ChFilterVisualize.h"
 using namespace chrono::sensor;
 #endif
 
@@ -67,7 +67,7 @@ ChContactMethod contact_method = ChContactMethod::SMC;
 ChVector<> trackPoint(0.0, 0.0, 1.75);
 
 // Simulation step sizes
-double step_size = 3e-3;
+double step_size = 5e-4;
 
 // Simulation end time
 double end_time = 1000;
@@ -85,10 +85,11 @@ double heartbeat = 1e-2;  // 100[Hz]
 void LogCopyright(bool show);
 void AddCommandLineOptions(ChCLI& cli);
 ChCoordsys<> GetVehicleConfig(int node_id,
-                              std::string& vehicle_filename,
-                              std::string& powertrain_filename,
-                              std::string& tire_filename,
-                              std::string& zombie_filename,
+                              std::string& vehicle,
+                              std::string& engine,
+                              std::string& transmission,
+                              std::string& tire,
+                              std::string& zombie,
                               double& cam_distance);
 
 // =============================================================================
@@ -127,14 +128,15 @@ int main(int argc, char* argv[]) {
     // Vehicle
     // -------
     // Get the vehicle JSON filenames and initial locations
-    std::string vehicle_filename, powertrain_filename, tire_filename, zombie_filename;
+    std::string vehicle_filename, engine_filename, transmission_filename, tire_filename, zombie_filename;
     double cam_distance;
-    auto initPos = GetVehicleConfig(node_id,              //
-                                    vehicle_filename,     //
-                                    powertrain_filename,  //
-                                    tire_filename,        //
-                                    zombie_filename,      //
-                                    cam_distance);        //
+    auto initPos = GetVehicleConfig(node_id,                //
+                                    vehicle_filename,       //
+                                    engine_filename,        //
+                                    transmission_filename,  //
+                                    tire_filename,          //
+                                    zombie_filename,        //
+                                    cam_distance);          //
 
     // Create the vehicle, set parameters, and initialize
     WheeledVehicle vehicle(vehicle_filename, contact_method);
@@ -146,7 +148,9 @@ int main(int argc, char* argv[]) {
     vehicle.SetWheelVisualizationType(wheel_vis_type);
 
     // Create and initialize the powertrain system
-    auto powertrain = ReadPowertrainJSON(powertrain_filename);
+    auto engine = ReadEngineJSON(engine_filename);
+    auto transmission = ReadTransmissionJSON(transmission_filename);
+    auto powertrain = chrono_types::make_shared<ChPowertrainAssembly>(engine, transmission);
     vehicle.InitializePowertrain(powertrain);
 
     // Create and initialize the tires
@@ -270,7 +274,7 @@ int main(int argc, char* argv[]) {
             cam_res_height,                                 // image height
             (float)CH_C_PI / 3,                             // FOV
             1,                                              // samples per pixel for antialiasing
-            CameraLensModelType::PINHOLE);                                       // camera type
+            CameraLensModelType::PINHOLE);                  // camera type
 
         intersection_camera->SetName("Intersection Cam");
         intersection_camera->PushFilter(chrono_types::make_shared<ChFilterRGBA8Access>());
@@ -381,54 +385,60 @@ void AddCommandLineOptions(ChCLI& cli) {
 }
 
 ChCoordsys<> GetVehicleConfig(int node_id,
-                              std::string& vehicle_filename,
-                              std::string& powertrain_filename,
-                              std::string& tire_filename,
-                              std::string& zombie_filename,
+                              std::string& vehicle,
+                              std::string& engine,
+                              std::string& transmission,
+                              std::string& tire,
+                              std::string& zombie,
                               double& cam_distance) {
     ChVector<> initLoc;
     ChQuaternion<> initRot;
     switch (node_id) {
         case 0:
-            vehicle_filename = vehicle::GetDataFile("sedan/vehicle/Sedan_Vehicle.json");
-            powertrain_filename = vehicle::GetDataFile("sedan/powertrain/Sedan_SimpleMapPowertrain.json");
-            tire_filename = vehicle::GetDataFile("sedan/tire/Sedan_TMeasyTire.json");
-            zombie_filename = synchrono::GetDataFile("vehicle/Sedan.json");
+            vehicle = vehicle::GetDataFile("sedan/vehicle/Sedan_Vehicle.json");
+            engine = vehicle::GetDataFile("sedan/powertrain/Sedan_EngineSimpleMap.json");
+            transmission = vehicle::GetDataFile("sedan/powertrain/Sedan_AutomaticTransmissionSimpleMap.json");
+            tire = vehicle::GetDataFile("sedan/tire/Sedan_TMeasyTire.json");
+            zombie = synchrono::GetDataFile("vehicle/Sedan.json");
             initLoc = ChVector<>(2.8, -70, 0.2);
             initRot = Q_from_AngZ(90 * CH_C_DEG_TO_RAD);
             cam_distance = 6.0;
             break;
         case 1:
-            vehicle_filename = vehicle::GetDataFile("sedan/vehicle/Sedan_Vehicle.json");
-            powertrain_filename = vehicle::GetDataFile("sedan/powertrain/Sedan_SimpleMapPowertrain.json");
-            tire_filename = vehicle::GetDataFile("sedan/tire/Sedan_TMeasyTire.json");
-            zombie_filename = synchrono::GetDataFile("vehicle/Sedan.json");
+            vehicle = vehicle::GetDataFile("sedan/vehicle/Sedan_Vehicle.json");
+            engine = vehicle::GetDataFile("sedan/powertrain/Sedan_EngineSimpleMap.json");
+            transmission = vehicle::GetDataFile("sedan/powertrain/Sedan_AutomaticTransmissionSimpleMap.json");
+            tire = vehicle::GetDataFile("sedan/tire/Sedan_TMeasyTire.json");
+            zombie = synchrono::GetDataFile("vehicle/Sedan.json");
             initLoc = ChVector<>(2.8, -40, 0.2);
             initRot = Q_from_AngZ(90 * CH_C_DEG_TO_RAD);
             cam_distance = 6.0;
             break;
         case 2:
-            vehicle_filename = vehicle::GetDataFile("citybus/vehicle/CityBus_Vehicle.json");
-            powertrain_filename = vehicle::GetDataFile("citybus/powertrain/CityBus_SimpleMapPowertrain.json");
-            tire_filename = vehicle::GetDataFile("citybus/tire/CityBus_TMeasyTire.json");
-            zombie_filename = synchrono::GetDataFile("vehicle/CityBus.json");
+            vehicle = vehicle::GetDataFile("citybus/vehicle/CityBus_Vehicle.json");
+            engine = vehicle::GetDataFile("citybus/powertrain/CityBus_EngineSimpleMap.json");
+            transmission = vehicle::GetDataFile("citybus/powertrain/CityBus_AutomaticTransmissionSimpleMap.json");
+            tire = vehicle::GetDataFile("citybus/tire/CityBus_TMeasyTire.json");
+            zombie = synchrono::GetDataFile("vehicle/CityBus.json");
             initLoc = ChVector<>(6.4, 0, 0.2);
             initRot = Q_from_AngZ(90 * CH_C_DEG_TO_RAD);
             cam_distance = 14.0;
             break;
         default:
             if (node_id % 2 == 0) {
-                vehicle_filename = vehicle::GetDataFile("sedan/vehicle/Sedan_Vehicle.json");
-                powertrain_filename = vehicle::GetDataFile("sedan/powertrain/Sedan_SimpleMapPowertrain.json");
-                tire_filename = vehicle::GetDataFile("sedan/tire/Sedan_TMeasyTire.json");
-                zombie_filename = synchrono::GetDataFile("vehicle/Sedan.json");
+                vehicle = vehicle::GetDataFile("sedan/vehicle/Sedan_Vehicle.json");
+                engine = vehicle::GetDataFile("sedan/powertrain/Sedan_EngineSimpleMap.json");
+                transmission = vehicle::GetDataFile("sedan/powertrain/Sedan_AutomaticTransmissionSimpleMap.json");
+                tire = vehicle::GetDataFile("sedan/tire/Sedan_TMeasyTire.json");
+                zombie = synchrono::GetDataFile("vehicle/Sedan.json");
                 initLoc = ChVector<>(-2.8, 70.0 - (node_id - 4.0) * 30, 0.2);
                 cam_distance = 6.0;
             } else {
-                vehicle_filename = vehicle::GetDataFile("citybus/vehicle/CityBus_Vehicle.json");
-                powertrain_filename = vehicle::GetDataFile("citybus/powertrain/CityBus_SimpleMapPowertrain.json");
-                tire_filename = vehicle::GetDataFile("citybus/tire/CityBus_TMeasyTire.json");
-                zombie_filename = synchrono::GetDataFile("vehicle/CityBus.json");
+                vehicle = vehicle::GetDataFile("citybus/vehicle/CityBus_Vehicle.json");
+                engine = vehicle::GetDataFile("citybus/powertrain/CityBus_EngineSimpleMap.json");
+                transmission = vehicle::GetDataFile("citybus/powertrain/CityBus_AutomaticTransmissionSimpleMap.json");
+                tire = vehicle::GetDataFile("citybus/tire/CityBus_TMeasyTire.json");
+                zombie = synchrono::GetDataFile("vehicle/CityBus.json");
                 initLoc = ChVector<>(-6.4, 70.0 - (node_id - 4.0) * 30, 0.2);
                 cam_distance = 14.0;
             }

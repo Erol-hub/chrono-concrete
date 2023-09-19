@@ -43,23 +43,21 @@ namespace vehicle {
 // -----------------------------------------------------------------------------
 ChVehicleCosimTerrainNode::ChVehicleCosimTerrainNode(double length, double width)
     : ChVehicleCosimBaseNode("TERRAIN"),
-      m_hdimX(length / 2),
-      m_hdimY(width / 2),
+      m_dimX(length / 2),
+      m_dimY(width / 2),
       m_load_mass(50),
-      m_render(false),
-      m_render_step(0.01),
       m_interface_type(InterfaceType::BODY) {}
 
 // -----------------------------------------------------------------------------
 
-void ChVehicleCosimTerrainNode::EnableRuntimeVisualization(bool render, double render_fps) {
-    m_render = render;
-    m_render_step = 1.0 / render_fps;
+void ChVehicleCosimTerrainNode::SetDimensions(double length, double width) {
+    m_dimX = length;
+    m_dimY = width;
 }
 
-void ChVehicleCosimTerrainNode::SetDimensions(double length, double width) {
-    m_hdimX = length / 2;
-    m_hdimY = width / 2;
+void ChVehicleCosimTerrainNode::GetDimensions(double& length, double& width) {
+    length = m_dimX;
+    width = m_dimY;
 }
 
 // -----------------------------------------------------------------------------
@@ -82,7 +80,7 @@ void ChVehicleCosimTerrainNode::Initialize() {
         // 1. Send terrain patch dimensions to MBS node
 
         // Note: take into account dimension of proxy bodies
-        double init_dim[3] = {GetInitHeight() + 0.05, 2 * m_hdimX, 2 * m_hdimY};
+        double init_dim[3] = {GetInitHeight() + 0.05, m_dimX, m_dimY};
         MPI_Send(init_dim, 3, MPI_DOUBLE, MBS_NODE_RANK, 0, MPI_COMM_WORLD);
 
         if (m_verbose) {
@@ -376,6 +374,9 @@ void ChVehicleCosimTerrainNode::SynchronizeWheeledMesh(int step_number, double t
 
         // Collect contact forces on subset of mesh vertices and load in m_mesh_contact.
         // Note that no forces are collected at the first step.
+        m_mesh_contact[i].vidx.clear();
+        m_mesh_contact[i].vforce.clear();
+
         if (step_number == 0)
             m_mesh_contact[i].nv = 0;
         else
@@ -387,7 +388,7 @@ void ChVehicleCosimTerrainNode::SynchronizeWheeledMesh(int step_number, double t
                      MPI_COMM_WORLD);
 
             double* force_data = new double[3 * m_mesh_contact[i].nv];
-            for (int iv = 0; iv < m_mesh_contact[i].nv; i++) {
+            for (int iv = 0; iv < m_mesh_contact[i].nv; iv++) {
                 force_data[3 * iv + 0] = m_mesh_contact[i].vforce[iv].x();
                 force_data[3 * iv + 1] = m_mesh_contact[i].vforce[iv].y();
                 force_data[3 * iv + 2] = m_mesh_contact[i].vforce[iv].z();
@@ -410,22 +411,15 @@ void ChVehicleCosimTerrainNode::SynchronizeTrackedMesh(int step_number, double t
 // Advance simulation of the terrain node by the specified duration
 // -----------------------------------------------------------------------------
 void ChVehicleCosimTerrainNode::Advance(double step_size) {
-    static double sim_time = 0;
-    static double render_time = 0;
-
     // Let derived classes advance the terrain state
     m_timer.reset();
     m_timer.start();
     OnAdvance(step_size);
-    sim_time += step_size;
     m_timer.stop();
     m_cum_sim_time += m_timer();
 
-    // Request the derived class to render simulation
-    if (m_render && sim_time >= render_time) {
-        Render(sim_time);
-        render_time += std::max(m_render_step, step_size);
-    }
+    // Possible rendering
+    Render(step_size);
 }
 
 // -----------------------------------------------------------------------------

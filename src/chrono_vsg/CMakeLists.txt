@@ -13,7 +13,7 @@ if(NOT ENABLE_MODULE_VSG)
    return()
 endif()
 
-message(STATUS "==== Chrono VSG module ====")
+message(STATUS "\n==== Chrono VSG module ====\n")
 
 mark_as_advanced(CLEAR VSG_LIBRARY)
 mark_as_advanced(CLEAR VSG_ROOT)
@@ -136,4 +136,6 @@ install(TARGETS ChronoEngine_vsg
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib)
 
-install(FILES ${ChronoEngine_VSG_HEADERS} DESTINATION include/chrono_vsg)
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/
+        DESTINATION include/chrono_vsg
+        FILES_MATCHING PATTERN "*.h")

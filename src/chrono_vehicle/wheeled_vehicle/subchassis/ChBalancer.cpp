@@ -39,16 +39,14 @@ ChBalancer::~ChBalancer() {
 // -----------------------------------------------------------------------------
 
 void ChBalancer::Initialize(std::shared_ptr<ChChassis> chassis, const ChVector<>& location) {
+    ChSubchassis::Initialize(chassis, location);
+
     m_parent = chassis;
     m_rel_loc = location;
 
     // Express the subchassis reference frame in the absolute coordinate system
     ChFrame<> to_abs(location);
     to_abs.ConcatenatePreTransformation(chassis->GetBody()->GetFrame_REF_to_abs());
-
-    // Chassis orientation (expressed in absolute frame)
-    // Recall that the suspension reference frame is aligned with the chassis
-    ChQuaternion<> chassisRot = chassis->GetBody()->GetFrame_REF_to_abs().GetRot();
 
     // Transform all hardpoints to absolute frame
     m_pointsL.resize(NUM_POINTS);
@@ -60,48 +58,53 @@ void ChBalancer::Initialize(std::shared_ptr<ChChassis> chassis, const ChVector<>
         m_pointsR[i] = to_abs.TransformLocalToParent(rel_pos);
     }
 
-    // Orientation of revolute joints
-    ChQuaternion<> joint_rot = chassisRot * Q_from_AngX(CH_C_PI_2);
+    // Transform pin directions to absolute frame
+    ChVector<> rel_dir = GetDirection();
+    m_dirL = to_abs.TransformDirectionLocalToParent(rel_dir);
+    rel_dir.y() = -rel_dir.y();
+    m_dirR = to_abs.TransformDirectionLocalToParent(rel_dir);
 
-    // Create left side beam body
-    m_beam[LEFT] = std::shared_ptr<ChBody>(chassis->GetSystem()->NewBody());
-    m_beam[LEFT]->SetNameString(m_name + "_balancer_L");
-    m_beam[LEFT]->SetPos(m_pointsL[BEAM]);
-    m_beam[LEFT]->SetRot(chassisRot);
-    m_beam[LEFT]->SetMass(GetBalancerBeamMass());
-    m_beam[LEFT]->SetInertiaXX(GetBalancerBeamInertia());
-    chassis->GetSystem()->AddBody(m_beam[LEFT]);
+    InitializeSide(LEFT, chassis, m_pointsL, m_dirL);
+    InitializeSide(RIGHT, chassis, m_pointsR, m_dirR);
+}
 
-    // Attach left balancer to chassis through a revolute joint and set joint limits
-    m_balancer_joint[LEFT] = chrono_types::make_shared<ChVehicleJoint>(
-        ChVehicleJoint::Type::REVOLUTE, m_name + "_rev_balancer_L", m_beam[LEFT], chassis->GetBody(),
-        ChCoordsys<>(m_pointsL[REVOLUTE], joint_rot), GetBushingData());
-    chassis->AddJoint(m_balancer_joint[LEFT]);
+void ChBalancer::InitializeSide(VehicleSide side,
+                                std::shared_ptr<ChChassis> chassis,
+                                const std::vector<ChVector<>>& points,
+                                const ChVector<>& dir) {
+    std::string suffix = (side == LEFT) ? "_L" : "_R";
 
-    if (m_balancer_joint[LEFT]->IsKinematic()) {
-        auto rev = std::static_pointer_cast<ChLinkLock>(m_balancer_joint[LEFT]->GetAsLink());
-        rev->GetLimit_Rz().SetActive(true);
-        rev->GetLimit_Rz().SetMin(-GetBalancerMaxPitch());
-        rev->GetLimit_Rz().SetMax(+GetBalancerMaxPitch());
-    }
+    // Chassis orientation (expressed in absolute frame)
+    // Recall that the suspension reference frame is aligned with the chassis.
+    ChQuaternion<> chassisRot = chassis->GetBody()->GetFrame_REF_to_abs().GetRot();
 
-    // Create right side beam body
-    m_beam[RIGHT] = std::shared_ptr<ChBody>(chassis->GetSystem()->NewBody());
-    m_beam[RIGHT]->SetNameString(m_name + "_balancer_R");
-    m_beam[RIGHT]->SetPos(m_pointsR[BEAM]);
-    m_beam[RIGHT]->SetRot(chassisRot);
-    m_beam[RIGHT]->SetMass(GetBalancerBeamMass());
-    m_beam[RIGHT]->SetInertiaXX(GetBalancerBeamInertia());
-    chassis->GetSystem()->AddBody(m_beam[RIGHT]);
+    // Orientation of revolute joint
+    ChVector<> w = dir.GetNormalized();
+    ChVector<> u = VECT_X;
+    ChVector<> v = Vcross(w, u);
+    v.Normalize();
+    u = Vcross(v, w);
+    ChMatrix33<> rot(u, v, w);
 
-    // Attach right balancer to chassis through a revolute joint and set joint limits
-    m_balancer_joint[RIGHT] = chrono_types::make_shared<ChVehicleJoint>(
-        ChVehicleJoint::Type::REVOLUTE, m_name + "_rev_balancer_R", m_beam[RIGHT], chassis->GetBody(),
-        ChCoordsys<>(m_pointsR[REVOLUTE], joint_rot), GetBushingData());
-    chassis->AddJoint(m_balancer_joint[RIGHT]);
+    ChQuaternion<> joint_rot = chassisRot * rot.Get_A_quaternion();
 
-    if (m_balancer_joint[RIGHT]->IsKinematic()) {
-        auto rev = std::static_pointer_cast<ChLinkLock>(m_balancer_joint[RIGHT]->GetAsLink());
+    // Create beam body
+    m_beam[side] = std::shared_ptr<ChBody>(chassis->GetSystem()->NewBody());
+    m_beam[side]->SetNameString(m_name + "_balancer" + suffix);
+    m_beam[side]->SetPos(points[BEAM]);
+    m_beam[side]->SetRot(chassisRot);
+    m_beam[side]->SetMass(GetBalancerBeamMass());
+    m_beam[side]->SetInertiaXX(GetBalancerBeamInertia());
+    chassis->GetSystem()->AddBody(m_beam[side]);
+
+    // Attach balancer to chassis through a revolute joint and set joint limits
+    m_balancer_joint[side] = chrono_types::make_shared<ChVehicleJoint>(
+        ChVehicleJoint::Type::REVOLUTE, m_name + "_rev_balancer" + suffix, m_beam[side], chassis->GetBody(),
+        ChCoordsys<>(points[REVOLUTE], joint_rot), GetBushingData());
+    chassis->AddJoint(m_balancer_joint[side]);
+
+    if (m_balancer_joint[side]->IsKinematic()) {
+        auto rev = std::static_pointer_cast<ChLinkLock>(m_balancer_joint[side]->GetAsLink());
         rev->GetLimit_Rz().SetActive(true);
         rev->GetLimit_Rz().SetMin(-GetBalancerMaxPitch());
         rev->GetLimit_Rz().SetMax(+GetBalancerMaxPitch());
@@ -133,13 +136,43 @@ void ChBalancer::AddVisualizationAssets(VisualizationType vis) {
     if (vis == VisualizationType::NONE)
         return;
 
-    auto box_left = chrono_types::make_shared<ChBoxShape>();
-    box_left->GetBoxGeometry().SetLengths(GetBalancerBeamDimensions());
-    m_beam[LEFT]->AddVisualShape(box_left);
+    const auto& dims = GetBalancerBeamDimensions();
 
-    auto box_right = chrono_types::make_shared<ChBoxShape>();
-    box_right->GetBoxGeometry().SetLengths(GetBalancerBeamDimensions());
-    m_beam[RIGHT]->AddVisualShape(box_right);
+    {
+        auto box_left = chrono_types::make_shared<ChBoxShape>(dims);
+        m_beam[LEFT]->AddVisualShape(box_left);
+
+        // Orientation of revolute joint
+        auto dir = GetDirection();
+        ChVector<> w = dir.GetNormalized();
+        ChVector<> u = VECT_X;
+        ChVector<> v = Vcross(w, u);
+        v.Normalize();
+        u = Vcross(v, w);
+        ChMatrix33<> rot(u, v, w);
+
+        auto p_left = m_beam[LEFT]->TransformPointParentToLocal(m_pointsL[REVOLUTE]);
+        auto cyl_left = chrono_types::make_shared<ChCylinderShape>(dims.z(), 1.4 * dims.y());
+        m_beam[LEFT]->AddVisualShape(cyl_left, ChFrame<>(p_left, rot));
+    }
+    {
+        auto box_right = chrono_types::make_shared<ChBoxShape>(dims);
+        m_beam[RIGHT]->AddVisualShape(box_right);
+
+        // Orientation of revolute joint
+        auto dir = GetDirection();
+        dir.y() = -dir.y();
+        ChVector<> w = dir.GetNormalized();
+        ChVector<> u = VECT_X;
+        ChVector<> v = Vcross(w, u);
+        v.Normalize();
+        u = Vcross(v, w);
+        ChMatrix33<> rot(u, v, w);
+
+        auto p_right = m_beam[RIGHT]->TransformPointParentToLocal(m_pointsR[REVOLUTE]);
+        auto cyl_right = chrono_types::make_shared<ChCylinderShape>(dims.z(), 1.4 * dims.y());
+        m_beam[RIGHT]->AddVisualShape(cyl_right, ChFrame<>(p_right, rot));
+    }
 }
 
 void ChBalancer::RemoveVisualizationAssets() {
@@ -155,7 +188,7 @@ void ChBalancer::ExportComponentList(rapidjson::Document& jsonDocument) const {
     std::vector<std::shared_ptr<ChBody>> bodies;
     bodies.push_back(m_beam[0]);
     bodies.push_back(m_beam[1]);
-    ChPart::ExportBodyList(jsonDocument, bodies);
+    ExportBodyList(jsonDocument, bodies);
 
     std::vector<std::shared_ptr<ChLink>> joints;
     std::vector<std::shared_ptr<ChLoadBodyBody>> bushings;
@@ -163,8 +196,8 @@ void ChBalancer::ExportComponentList(rapidjson::Document& jsonDocument) const {
                                        : bushings.push_back(m_balancer_joint[0]->GetAsBushing());
     m_balancer_joint[1]->IsKinematic() ? joints.push_back(m_balancer_joint[1]->GetAsLink())
                                        : bushings.push_back(m_balancer_joint[1]->GetAsBushing());
-    ChPart::ExportJointList(jsonDocument, joints);
-    ChPart::ExportBodyLoadList(jsonDocument, bushings);
+    ExportJointList(jsonDocument, joints);
+    ExportBodyLoadList(jsonDocument, bushings);
 }
 
 void ChBalancer::Output(ChVehicleOutput& database) const {

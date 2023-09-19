@@ -18,130 +18,6 @@ stages:
   - test
   - deploy
 
-
-#---------------------#
-# Arch Linux Builders #
-#---------------------#
-
-
-.archlinux:
-  tags:
-  - linux
-  image:
-    name: archlinux:base-devel
-    entrypoint: ["/usr/bin/bash", "-c"]
-  before_script:
-  - uname -a
-  - pacman -Sy --noconfirm cuda git eigen cmake glfw glm glew glut irrlicht ninja wget python python-pip openmpi openssh swig hdf5
-# Clean up the package cache to make more space for the build
-  - pacman -Scc --noconfirm
-  - ldconfig
-  - wget https://bitbucket.org/blaze-lib/blaze/downloads/blaze-3.8.tar.gz
-  - tar -xf blaze-3.8.tar.gz
-  - cp blaze-3.8/blaze -r /usr/local/include
-  - git submodule init
-  - git submodule update
-  - mkdir -p build
-
-# Make flatbuffers
-#  - cd src/chrono_thirdparty/flatbuffers
-#  - cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release .
-#  - ninja -j 8
-#  - cd $CI_PROJECT_DIR
-
-linux:arch-gcc:build:
-  stage: build
-  extends: .archlinux
-  script:
-  - cd build
-  - echo $CI_PROJECT_DIR
-  - cmake ../ --preset=linuxci
-    -DCMAKE_C_COMPILER=/usr/bin/gcc
-    -DCMAKE_CXX_COMPILER=/usr/bin/g++
-    -DEIGEN3_INCLUDE_DIR=/usr/include/eigen3
-    -DBUILD_TESTING_GPU=FALSE
-    -DBUILD_TESTING_SENSOR=FALSE
-  - ninja -j 8
-  artifacts:
-    expire_in: 60m
-    paths:
-    - build/
-
-linux:arch-gcc:test:
-  stage: test
-  needs: ["linux:arch-gcc:build"]
-  extends: .archlinux
-  script:
-  - cd build
-  - export OMP_NUM_THREADS=8
-  - export CTEST_OUTPUT_ON_FAILURE=1
-  - ninja test
-  dependencies: ["linux:arch-gcc:build"]
-
-linux:arch-llvm:build:
-  stage: build
-  extends: .archlinux
-  script:
-  - pacman -S --noconfirm llvm clang openmp
-  - cd build
-  - cmake ../ --preset=linuxci
-    -DCMAKE_C_COMPILER=/usr/bin/clang
-    -DCMAKE_CXX_COMPILER=/usr/bin/clang++
-    -DEIGEN3_INCLUDE_DIR=/usr/include/eigen3
-    -DCUDA_HOST_COMPILER=/usr/bin/gcc
-    -DBUILD_TESTING_GPU=FALSE
-    -DBUILD_TESTING_SENSOR=FALSE
-    -DCMAKE_CXX_FLAGS=-fcolor-diagnostics
-  - export CLANG_FORCE_COLOR_DIAGNOSTICS=1
-  - ninja -j 8
-  artifacts:
-    expire_in: 60m
-    paths:
-    - build/
-
-
-linux:arch-llvm:test:
-  stage: test
-  needs: ["linux:arch-llvm:build"]
-  extends: .archlinux
-  script:
-  - pacman -S --noconfirm llvm clang openmp
-  - cd build
-  - export OMP_NUM_THREADS=8
-  - export CTEST_OUTPUT_ON_FAILURE=1
-  - ninja test
-  dependencies: ["linux:arch-llvm:build"]
-
-
-#----------------#
-# Ubuntu Builder #
-#----------------#
-
-.ubuntu:
-  tags:
-    - linux
-  image:
-    name: nvidia/cuda:11.6.0-devel-ubuntu20.04
-  before_script:
-    - uname -a
-    - export DEBIAN_FRONTEND=noninteractive
-    - apt-get update; apt-get -y install wget python git
-        cmake ninja-build build-essential libboost-dev swig libeigen3-dev
-        libglfw3-dev libglm-dev libglew-dev freeglut3-dev libirrlicht-dev
-        libxxf86vm-dev libopenmpi-dev python3 python3-dev libhdf5-dev libnvidia-gl-515
-    - ldconfig
-    - wget https://bitbucket.org/blaze-lib/blaze/downloads/blaze-3.8.tar.gz
-    - tar -xf blaze-3.8.tar.gz
-    - cp -r blaze-3.8/blaze /usr/local/include
-    - git submodule init
-    - git submodule update
-    - mkdir -p build
-    # Make flatbuffers
-    - cd src/chrono_thirdparty/flatbuffers
-    - cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release .
-    - ninja -j 8
-    - cd $CI_PROJECT_DIR
-
 linux:doxygen:deploy:
   tags:
   - linux
@@ -157,13 +33,13 @@ linux:doxygen:deploy:
     - tar -xf doxygen-1.8.16.linux.bin.tar.gz
     - mkdir -p ~/.ssh
     - chmod 0700 ~/.ssh
-# This private key is only useable from specific IPs, so it should be okay to
-# be included here.
+    # This private key is only useable from specific IPs, so it should be okay to
+    # be included here.
     - cp $API_PRIVATE_KEY ~/.ssh/id_ed25519
     - chmod 0600 ~/.ssh/id_ed25519
-# Remove any duplicate host key entries, if necessary
+    # Remove any duplicate host key entries, if necessary
     - if test -f ~/.ssh/known_hosts; then ssh-keygen -R $API_REINDEX_ENDPOINT; fi
-# Cache a verified host pubkey from file to avoid MITM attacks
+    # Cache a verified host pubkey from file to avoid MITM attacks
     - cat $API_ENDPOINT_PUBKEY >> ~/.ssh/known_hosts
   script:
     - export PATH="$PWD/doxygen-1.8.16/bin:$PATH"
@@ -174,10 +50,6 @@ linux:doxygen:deploy:
     - rsync /tmp/chrono_doxygen/searchdata.xml $API_SEARCH_ENDPOINT
     - ssh $API_REINDEX_ENDPOINT /usr/bin/doxyindexer -o $API_CGI_DIR $API_CGI_DIR/searchdata.xml
   needs:
-    - job: linux:arch-gcc:test
-      artifacts: false
-    - job: macos-intel:monterey:test
-      artifacts: false
     - job: macos-apple:monterey:test
       artifacts: false
     - job: windows:vs2022:test
@@ -189,49 +61,99 @@ linux:doxygen:deploy:
     - if: '$CI_COMMIT_REF_NAME == "main"'
       when: always
 
-# Ubuntu 20.04 doesn't have a sufficiently new CMake for presets, so we rely on manual configuration
-linux:ubuntu2004:build:
-  stage: build
+#----------------#
+# Ubuntu Builder #
+#----------------#
+
+.ubuntu:
+  tags:
+    - linux
+  image:
+      name: uwsbel/packages:ubuntu
+  before_script:
+    # Defining configuration variables
+    - export LIB_DIR="lib"
+    - export IOMP5_DIR=""
+    # Obtain dependencies
+    - apt-get update; apt-get -y install unzip wget python3 python3-pip
+      git cmake ninja-build doxygen libvulkan-dev pkg-config libirrlicht-dev 
+      freeglut3-dev mpich libasio-dev libboost-dev libglfw3-dev libglm-dev 
+      libglew-dev libtinyxml2-dev swig python3-dev libhdf5-dev libnvidia-gl-530
+    - wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | 
+      gpg --dearmor | tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
+    - echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] 
+      https://apt.repos.intel.com/oneapi all main" | tee /etc/apt/sources.list.d/oneAPI.list
+    - apt update
+    - apt -y install intel-basekit libxcb-randr0-dev libxcb-xtest0-dev libxcb-xinerama0-dev
+      libxcb-shape0-dev libxcb-xkb-dev xorg-dev
+    - ldconfig
+    # Initialize git repository
+    - cd $CI_PROJECT_DIR
+    - git submodule init
+    - git submodule update
+    - mkdir -p build
+
+linux:ubuntu22.04-gcc:build:
   extends: .ubuntu
+  stage: build
   script:
-    - cd build
-    - cmake ../ -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=TRUE
-        -DBUILD_BENCHMARKING=TRUE -DENABLE_MODULE_POSTPROCESS=TRUE
-        -DENABLE_MODULE_PYTHON=TRUE -DENABLE_MODULE_COSIMULATION=FALSE
-        -DENABLE_MODULE_IRRLICHT=TRUE -DENABLE_MODULE_VEHICLE=TRUE
-        -DENABLE_MODULE_MULTICORE=TRUE -DENABLE_MODULE_OPENGL=TRUE
-        -DENABLE_MODULE_FSI=TRUE -DENABLE_MODULE_SYNCHRONO=TRUE
-        -DENABLE_MODULE_CSHARP=TRUE -DENABLE_MODULE_GPU=TRUE 
-        -DENABLE_MODULE_DISTRIBUTED=TRUE
-        -DENABLE_HDF5=TRUE
-        -DCMAKE_C_COMPILER=/usr/bin/gcc
-        -DCMAKE_CXX_COMPILER=/usr/bin/g++
-        -DCUDA_HOST_COMPILER=/usr/bin/gcc
-        -DPYTHON_EXECUTABLE=/usr/bin/python3
-        -DEIGEN3_INCLUDE_DIR=/usr/include/eigen3
-        -DCMAKE_VERBOSE_MAKEFILE=TRUE
-        -DENABLE_MODULE_SENSOR=TRUE
-        -DBUILD_TESTING_SENSOR=TRUE
-        -DOptiX_INSTALL_DIR=/opt/optix/7.5.0
-    - ninja -j 8
+    # Defining compiler variables
+    - export C_COMPILER="/usr/bin/gcc"
+    - export CXX_COMPILER="/usr/bin/g++"
+    # Building chrono
+    - cmake -G "Ninja" -B $CI_PROJECT_DIR/build/ -S $CI_PROJECT_DIR --preset=linuxci
+    # Making chrono
+    - cd $CI_PROJECT_DIR/build
+    - ninja
   artifacts:
     expire_in: 60m
     paths:
       - build/
 
-linux:ubuntu2004:test:
+linux:ubuntu22.04-gcc:test:
   stage: test
-  needs: ["linux:ubuntu2004:build"]
+  needs: ["linux:ubuntu22.04-gcc:build"]
   extends: .ubuntu
   script:
     - cd build
     - export OMP_NUM_THREADS=8
     - export CTEST_OUTPUT_ON_FAILURE=1
     - ninja test
-  dependencies: ["linux:ubuntu2004:build"]
+  dependencies: ["linux:ubuntu22.04-gcc:build"]
+
+linux:ubuntu22.04-clang:build:
+  extends: .ubuntu
+  stage: build
+  script:
+    # Defining compiler variables
+    - export C_COMPILER="/usr/bin/clang"
+    - export CXX_COMPILER="/usr/bin/clang++"
+    # Building chrono
+    - cmake -G "Ninja" -B $CI_PROJECT_DIR/build/ -S $CI_PROJECT_DIR --preset=linuxci -DCUDA_HOST_COMPILER=/usr/bin/gcc
+    # Making chrono
+    - cd $CI_PROJECT_DIR/build
+    - ninja
+  artifacts:
+    expire_in: 60m
+    paths:
+      - build/
+
+linux:ubuntu22.04-clang:test:
+  stage: test
+  needs: ["linux:ubuntu22.04-clang:build"]
+  extends: .ubuntu
+  script:
+    - cd build
+    - export OMP_NUM_THREADS=8
+    - export CTEST_OUTPUT_ON_FAILURE=1
+    - ninja test
+  dependencies: ["linux:ubuntu22.04-clang:build"]
 
 .ubuntu-deploy-base:
-  extends: .ubuntu
+  tags:
+    - linux
+  image:
+      name: uwsbel/packages:ubuntu
   before_script:
     # this script overwrites the default ubuntu script to include conda preparations
     - uname -a
@@ -259,10 +181,10 @@ linux:ubuntu2004:test:
     - conda config --add channels https://conda.anaconda.org/conda-forge
     - conda config --add channels https://conda.anaconda.org/intel
   environment:
-    name: pychrono-ubuntu2004
+    name: pychrono-ubuntu22.04
     url: https://anaconda.org/projectchrono/pychrono
 
-linux:ubuntu2004:deploy-python3.8:
+linux:ubuntu22.04:deploy-python3.8:
   stage: deploy
   needs: []
   extends: .ubuntu-deploy-base
@@ -273,7 +195,7 @@ linux:ubuntu2004:deploy-python3.8:
     - anaconda -t $ANACONDA_TOKEN upload $HOME/miniconda3/conda-bld/linux-64/pychrono*.bz2 -l main --force
   when: manual
 
-linux:ubuntu2004:deploy-python3.9:
+linux:ubuntu22.04:deploy-python3.9:
   stage: deploy
   needs: []
   extends: .ubuntu-deploy-base
@@ -283,7 +205,7 @@ linux:ubuntu2004:deploy-python3.9:
     - anaconda -t $ANACONDA_TOKEN upload $HOME/miniconda3/conda-bld/linux-64/pychrono*.bz2 -l main --force
   when: manual
 
-linux:ubuntu2004:deploy-python3.10:
+linux:ubuntu22.04:deploy-python3.10:
   stage: deploy
   needs: []
   extends: .ubuntu-deploy-base
@@ -292,60 +214,6 @@ linux:ubuntu2004:deploy-python3.10:
     - conda build ./contrib/packaging-python/conda -c intel -c conda-forge -c dlr-sc --no-remove-work-dir --dirty --python=3.10
     - anaconda -t $ANACONDA_TOKEN upload $HOME/miniconda3/conda-bld/linux-64/pychrono*.bz2 -l main --force
   when: manual
-
-#------------------#
-#   EL8 Builder    #
-#------------------#
-
-.almalinux:
-  tags:
-    - linux
-  image:
-    name: almalinux
-  before_script:
-    - uname -a
-    - printf "[oneAPI]\nname=Intel® oneAPI repository\nbaseurl=https://yum.repos.intel.com/oneapi\nenabled=1\ngpgcheck=1\nrepo_gpgcheck=1\ngpgkey=https://yum.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB\n" > /etc/yum.repos.d/oneAPI.repo
-    - dnf groupinstall -y 'Development Tools'
-    - dnf config-manager --set-enabled powertools
-    - dnf install -y epel-release
-    - dnf install -y cmake irrlicht irrlicht-devel glew-devel eigen3 glfw-devel ninja-build glm-devel freeglut-devel swig platform-python-devel intel-oneapi-mkl-devel
-    - git submodule init
-    - git submodule update
-    - mkdir -p build
-
-linux:almalinux:build:
-  stage: build
-  extends: .almalinux
-  script:
-    - cd build
-    - cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release
-        -DBUILD_DEMOS=ON -DBUILD_BENCHMARK=ON -DBUILD_TESTING=ON
-        -DIOMP5_LIBRARY="/opt/intel/oneapi/compiler/latest/linux/compiler/lib/intel64_lin/libiomp5.so"
-        -DPYTHON_EXECUTABLE=usr/bin/python3
-        -DENABLE_MODULE_IRRLICHT=ON
-        -DENABLE_MODULE_PARDISO_MKL=ON
-        -DENABLE_MODULE_PYTHON=ON
-        -DENABLE_MODULE_COSIMULATION=ON
-        -DENABLE_MODULE_POSTPROCESS=ON
-        -DENABLE_MODULE_OPENGL=ON
-        -DENABLE_MODULE_VEHICLE=ON
-        -DENABLE_HDF5=ON
-    - ninja -j 8
-  artifacts:
-    expire_in: 60m
-    paths:
-      - build/
-
-linux:almalinux:test:
-  stage: test
-  needs: ["linux:almalinux:build"]
-  extends: .almalinux
-  script:
-    - cd build
-    - export OMP_NUM_THREADS=8
-    - export CTEST_OUTPUT_ON_FAILURE=1
-    - ninja test
-  dependencies: ["linux:almalinux:build"]
 
 #------------------#
 # Windows Builders #
@@ -360,18 +228,19 @@ linux:almalinux:test:
   - echo $CI_PROJECT_DIR
   - git submodule init
   - git submodule update
-  - mkdir -Force build
+  - mkdir -Force -p build
+  - mkdir -Force -p install
+  #- mkdir -Force build
 
 windows:vs2022:build:
   stage: build
   extends: .windows
   script:
-  #- cd $CI_PROJECT_DIR/src/chrono_thirdparty/flatbuffers
-  #- cmake ../ -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release .
-  #- MSBuild.exe FlatBuffers.sln -maxcpucount:8 -property:Configuration=Release
-  - cd $CI_PROJECT_DIR/build
-  - cmake -DMPIEXEC_EXECUTABLE="C:/Program Files/Microsoft MPI/Bin/mpiexec.exe" --preset=windowsci-vs2022 ..
-  - cmake --build . -t ALL_BUILD -j 8 --config Release
+  # Configuring chrono
+  - cmake -B "$CI_PROJECT_DIR\build" -S "$CI_PROJECT_DIR" --preset=windowsci-vs2022
+  - cd build
+  # Building chrono
+  - cmake --build . -j 8 --config Release
   artifacts:
     expire_in: 60m
     paths:
@@ -386,36 +255,7 @@ windows:vs2022:test:
   - ctest --extra-verbose --output-on-failure
   dependencies: ["windows:vs2022:build"]
 
-windows:vs2019:build:
-  stage: build
-  extends: .windows
-  script:
-  # Build flatbuffers
-  #- cd $CI_PROJECT_DIR/src/chrono_thirdparty/flatbuffers
-  #- cmake -G "Visual Studio 17 2022" -T v142 -DCMAKE_BUILD_TYPE=Release .
-  #- MSBuild.exe FlatBuffers.sln -maxcpucount:8 -property:Configuration=Release
-  # Main build
-  - cd $CI_PROJECT_DIR/build
-  - cmake --preset=windowsci-vs2019 ..
-  - cmake --build . -t ALL_BUILD -j 8 --config Release
-  #- Invoke-Expression "& `'C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\Common7\IDE\devenv.com`' Chrono.sln -Build `"Release|x64`" -log buildlog.txt"
-  #- '& "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\MSBuild\Current\Bin\MSBuild.exe" Chrono.sln -maxcpucount:8 -property:Configuration=Release'
-  #- ninja -j 1
-  artifacts:
-    expire_in: 60m
-    paths:
-      - build/
-
-windows:vs2019:test:
-  stage: test
-  needs: ["windows:vs2019:build"]
-  extends: .windows
-  script:
-  - cd build
-  - ctest --extra-verbose --output-on-failure
-  dependencies: ["windows:vs2019:build"]
-
-.windows-vs2019-deploy-base:
+.windows-deploy-base:
   tags:
     - windows11
   before_script:
@@ -454,10 +294,10 @@ windows:vs2019:test:
     name: pychrono-win64
     url: https://anaconda.org/projectchrono/pychrono
 
-windows:vs2019:deploy-python3.8:
+windows:deploy-python3.8:
   stage: deploy
   needs: []
-  extends: .windows-vs2019-deploy-base
+  extends: .windows-deploy-base
   script:
     # Building pyChrono for python v3.8
     - conda build .\contrib\packaging-python\conda -c conda-forge -c dlr-sc -c intel --python=3.8 --no-remove-work-dir
@@ -477,10 +317,10 @@ windows:vs2019:deploy-python3.8:
     paths:
       - ./logs/
 
-windows:vs2019:deploy-python3.9:
+windows:deploy-python3.9:
   stage: deploy
   needs: []
-  extends: .windows-vs2019-deploy-base
+  extends: .windows-deploy-base
   script:
     # Building pyChrono for python v3.9
     - conda build .\contrib\packaging-python\conda -c conda-forge -c dlr-sc -c intel --python=3.9 --no-remove-work-dir
@@ -500,10 +340,10 @@ windows:vs2019:deploy-python3.9:
     paths:
       - ./logs/
 
-windows:vs2019:deploy-python3.10:
+windows:deploy-python3.10:
   stage: deploy
   needs: []
-  extends: .windows-vs2019-deploy-base
+  extends: .windows-deploy-base
   script:
     # Building pyChrono for python v3.10
     - conda build .\contrib\packaging-python\conda -c conda-forge -c dlr-sc -c intel --python=3.10 --no-remove-work-dir
@@ -537,6 +377,7 @@ windows:vs2019:deploy-python3.10:
   - mkdir -p build
   - export BREW_PY_MAJOR=$(python3 --version | awk '{print $2;}' | cut -d. -f1,2)
   - export BREW_PY_VER=$(find $HOMEBREW_PREFIX/Cellar/python@$BREW_PY_MAJOR -depth 1 | cut -d/ -f6)
+  - echo $CI_PROJECT_DIR
 
 .macos-monterey:
   extends: .macos
@@ -547,13 +388,12 @@ windows:vs2019:deploy-python3.10:
   stage: build
   extends: .macos-monterey
   script:
-  - cd build
-  - cmake ../ --preset=macosci
-    -DCMAKE_C_COMPILER=$(which clang)
-    -DCMAKE_CXX_COMPILER=$(which clang++)
-    -DCMAKE_VERBOSE_MAKEFILE=TRUE
+  # Configuring chrono
+  - cmake -G "Ninja Multi-Config" -B $CI_PROJECT_DIR/build/ -S $CI_PROJECT_DIR --preset=macosci
   - export CLANG_FORCE_COLOR_DIAGNOSTICS=1
-  - ninja -j 7
+  - cd build
+  # Building chrono
+  - cmake --build . --config Release -j 7
   artifacts:
     expire_in: 60m
     paths:
@@ -564,24 +404,12 @@ windows:vs2019:deploy-python3.10:
   extends: .macos-monterey
   script:
   - cd build
+  # Copying files to correct directory for CI because of Ninja Multi-Config
+  - cp -r bin/Release/* bin/
+  - cp -r bin/data .
   - export CTEST_OUTPUT_ON_FAILURE=1
   - ninja test
 
-macos-intel:monterey:build:
-  extends: .macos-monterey-build
-  tags:
-    - macos
-    - monterey
-    - intel
-
-macos-intel:monterey:test:
-  extends: .macos-monterey-test
-  tags:
-    - macos
-    - monterey
-    - intel
-  needs: ["macos-intel:monterey:build"]
-  dependencies: ["macos-intel:monterey:build"]
 
 macos-apple:monterey:build:
   extends: .macos-monterey-build
@@ -631,16 +459,6 @@ macos-apple:monterey:test:
     name: pychrono-macos
     url: https://anaconda.org/projectchrono/pychrono
 
-.macos-intel-deploy-base:
-  extends: .macos-deploy-base
-  tags:
-    - intel
-  script:
-    - conda config --add channels intel
-  environment:
-    name: pychrono-macos
-    url: https://anaconda.org/projectchrono/pychrono
-
 .macos-apple-deploy-base:
   extends: .macos-deploy-base
   tags:
@@ -648,49 +466,6 @@ macos-apple:monterey:test:
   environment:
     name: pychrono-macos
     url: https://anaconda.org/projectchrono/pychrono
-
-macos-intel:macos-deploy-python3.8:
-  stage: deploy
-  needs: []
-  extends: .macos-intel-deploy-base
-  script:
-    - echo "Build PyChrono 3.8 and deploy via Anaconda..."
-    - conda build purge-all
-    - conda build ./contrib/packaging-python/conda --no-remove-work-dir --dirty --python=3.8
-    - anaconda -t $ANACONDA_TOKEN upload $HOME/miniconda/conda-bld/osx-64/pychrono*.bz2 -l main --force
-  when: manual
-  tags:
-    - macos
-    - monterey
-    - intel
-macos-intel:macos-deploy-python3.9:
-  stage: deploy
-  needs: []
-  extends: .macos-intel-deploy-base
-  script:
-    - echo "Build PyChrono 3.9 and deploy via Anaconda..."
-    - conda build purge-all
-    - conda build ./contrib/packaging-python/conda --no-remove-work-dir --dirty --python=3.9
-    - anaconda -t $ANACONDA_TOKEN upload $HOME/miniconda/conda-bld/osx-64/pychrono*.bz2 -l main --force
-  when: manual
-  tags:
-    - macos
-    - monterey
-    - intel
-macos-intel:macos-deploy-python3.10:
-  stage: deploy
-  needs: []
-  extends: .macos-intel-deploy-base
-  script:
-    - echo "Build PyChrono 3.10 and deploy via Anaconda..."
-    - conda build purge-all
-    - conda build ./contrib/packaging-python/conda --no-remove-work-dir --dirty --python=3.10
-    - anaconda -t $ANACONDA_TOKEN upload $HOME/miniconda/conda-bld/osx-64/pychrono*.bz2 -l main --force
-  when: manual
-  tags:
-    - macos
-    - monterey
-    - intel
 
 macos-apple:macos-deploy-python3.8:
   stage: deploy
@@ -706,6 +481,7 @@ macos-apple:macos-deploy-python3.8:
     - macos
     - monterey
     - apple
+
 macos-apple:macos-deploy-python3.9:
   stage: deploy
   needs: []
@@ -720,6 +496,7 @@ macos-apple:macos-deploy-python3.9:
     - macos
     - monterey
     - apple
+
 macos-apple:macos-deploy-python3.10:
   stage: deploy
   needs: []

@@ -12,13 +12,15 @@ endif()
 
 set(DEMOS
     demo_VEH_CityBus
+    demo_VEH_FEDA_SSC
+    demo_VEH_Duro
     demo_VEH_Gator
     demo_VEH_HMMWV
     demo_VEH_HMMWV_Accel
-    demo_VEH_HMMWV_DoubleLaneChange
-    demo_VEH_HMMWV_DefSoil
+    demo_VEH_HMMWV_Rollover
     demo_VEH_HMMWV9
     demo_VEH_UAZBUS
+    demo_VEH_U401
     demo_VEH_WheeledGeneric
     demo_VEH_WheeledJSON
 )
@@ -38,7 +40,6 @@ if(ENABLE_MODULE_IRRLICHT)
        demo_VEH_MTV_ride
        demo_VEH_RCCar
        demo_VEH_Sedan
-       demo_VEH_Sedan_AIDriver
        demo_VEH_Sedan_Lockable_Diff
        demo_VEH_UAZBUS_SAE
    )
@@ -54,7 +55,7 @@ list(APPEND LIBS "ChronoEngine_vehicle")
 list(APPEND LIBS "ChronoModels_vehicle")
 
 if(ENABLE_MODULE_IRRLICHT)
-    include_directories(${CH_IRRLICHTINC})
+    include_directories(${CH_IRRLICHT_INCLUDES})
     set(COMPILER_FLAGS "${COMPILER_FLAGS} ${CH_IRRLICHT_CXX_FLAGS}")
     list(APPEND LIBS "ChronoEngine_irrlicht")
     list(APPEND LIBS "ChronoEngine_vehicle_irrlicht")
@@ -62,7 +63,6 @@ endif()
 
 if(ENABLE_MODULE_VSG)
     set(CMAKE_CXX_STANDARD 17)
-
     include_directories(${CH_VSG_INCLUDES})
     list(APPEND LIBS "ChronoEngine_vsg")
     list(APPEND LIBS "ChronoEngine_vehicle_vsg")
@@ -78,6 +78,10 @@ endif()
 if(ENABLE_MODULE_MUMPS)
     include_directories(${CH_MUMPS_INCLUDES})
     list(APPEND LIBS "ChronoEngine_mumps")
+endif()
+
+if(ENABLE_MODULE_POSTPROCESS)
+    list(APPEND LIBS "ChronoEngine_postprocess")
 endif()
 
 #--------------------------------------------------------------

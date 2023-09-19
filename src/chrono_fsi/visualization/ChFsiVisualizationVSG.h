@@ -30,7 +30,7 @@ namespace fsi {
 class CH_FSI_API ChFsiVisualizationVSG : public ChFsiVisualization {
   public:
     /// Create a run-time FSI visualization object associated with a given Chrono::Fsi system.
-    ChFsiVisualizationVSG(ChSystemFsi* sysFSI);
+    ChFsiVisualizationVSG(ChSystemFsi* sysFSI, bool verbose = true);
 
     ~ChFsiVisualizationVSG();
 
@@ -58,6 +58,12 @@ class CH_FSI_API ChFsiVisualizationVSG : public ChFsiVisualization {
 
     /// Set rendering mode for mesh objects (default: WIREFRAME).
     virtual void SetRenderMode(RenderMode mode) override;
+
+    /// Enable/disable use of shy box textures (default: false).
+    void SetUseSkyBox(bool val);
+
+    /// Set background color.
+    void SetClearColor(const ChColor& color);
 
     /// Enable/disable information overlay (default: false).
     virtual void EnableInfoOverlay(bool val) override;

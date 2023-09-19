@@ -210,6 +210,9 @@ class ChApiIrr ChVisualSystemIrrlicht : virtual public ChVisualSystem {
     /// Set the speed of the shown mode (only if some ChModalAssembly is found).
     virtual void SetModalSpeed(double val) override;
 
+    /// Set the maximum number of modes selectable (only if some ChModalAssembly is found).
+    virtual void SetModalModesMax(int maxModes) override;
+
     /// Show the realtime profiler in the 3D view.
     void ShowProfiler(bool val);
 
@@ -287,6 +290,12 @@ class ChApiIrr ChVisualSystemIrrlicht : virtual public ChVisualSystem {
     /// The file extension determines the image format.
     virtual void WriteImageToFile(const std::string& filename) override;
 
+    /// Get internal utility flag value.
+    bool GetUtilityFlag() const { return m_utility_flag; }
+
+    /// Set internal utility flag value.
+    void SetUtilityFlag(bool flag) { m_utility_flag = flag; }
+
   private:
     /// /// Irrlicht scene node for a visual model not associated with a physics item.
     class ChIrrNodeVisual : public irr::scene::ISceneNode {
@@ -339,6 +348,7 @@ class ChApiIrr ChVisualSystemIrrlicht : virtual public ChVisualSystem {
     std::unique_ptr<EffectHandler> m_effect_handler;   ///< effect handler for shadow maps
     bool m_use_effects;                                ///< flag to enable/disable effects
     bool m_modal;                                      ///< visualize modal analysis
+    bool m_utility_flag = false;                       ///< utility flag that may be accessed from outside
 
     // shared meshes
     irr::scene::IAnimatedMesh* sphereMesh;

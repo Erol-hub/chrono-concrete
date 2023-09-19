@@ -31,6 +31,13 @@
 
 #include "chrono_vehicle/cosim/terrain/ChVehicleCosimTerrainNodeGranularGPU.h"
 
+#ifdef CHRONO_VSG
+    #include "chrono_vsg/ChVisualSystemVSG.h"
+#endif
+#ifdef CHRONO_OPENGL
+    #include "chrono_opengl/ChVisualSystemOpenGL.h"
+#endif
+
 using std::cout;
 using std::cerr;
 using std::endl;
@@ -49,8 +56,7 @@ static const int body_id_obstacles = 100000;
 
 // -----------------------------------------------------------------------------
 
-ChVehicleCosimTerrainNodeGranularGPU::ChVehicleCosimTerrainNodeGranularGPU(double length,
-                                                                           double width)
+ChVehicleCosimTerrainNodeGranularGPU::ChVehicleCosimTerrainNodeGranularGPU(double length, double width)
     : ChVehicleCosimTerrainNodeChrono(Type::GRANULAR_GPU, length, width, ChContactMethod::SMC),
       m_sampling_type(utils::SamplingType::POISSON_DISK),
       m_init_depth(0.2),
@@ -79,11 +85,6 @@ ChVehicleCosimTerrainNodeGranularGPU::ChVehicleCosimTerrainNodeGranularGPU(doubl
 
     // Defer construction of the granular system to Construct
     m_systemGPU = nullptr;
-
-    // Create OpenGL visualization system
-#ifdef CHRONO_OPENGL
-    m_vsys = new opengl::ChVisualSystemOpenGL;
-#endif
 }
 
 ChVehicleCosimTerrainNodeGranularGPU::ChVehicleCosimTerrainNodeGranularGPU(const std::string& specfile)
@@ -106,20 +107,9 @@ ChVehicleCosimTerrainNodeGranularGPU::ChVehicleCosimTerrainNodeGranularGPU(const
 
     // Read GPU granular terrain parameters from provided specfile
     SetFromSpecfile(specfile);
-
-    // Create OpenGL visualization system
-#ifdef CHRONO_OPENGL
-    m_vsys = new opengl::ChVisualSystemOpenGL;
-#endif
 }
 
-ChVehicleCosimTerrainNodeGranularGPU ::~ChVehicleCosimTerrainNodeGranularGPU() {
-    delete m_system;
-    delete m_systemGPU;
-#ifdef CHRONO_OPENGL
-    delete m_vsys;
-#endif
-}
+ChVehicleCosimTerrainNodeGranularGPU ::~ChVehicleCosimTerrainNodeGranularGPU() {}
 
 // -----------------------------------------------------------------------------
 
@@ -128,10 +118,8 @@ void ChVehicleCosimTerrainNodeGranularGPU::SetFromSpecfile(const std::string& sp
     Document d;
     ReadSpecfile(specfile, d);
 
-    double length = d["Patch dimensions"]["Length"].GetDouble();
-    double width = d["Patch dimensions"]["Width"].GetDouble();
-    m_hdimX = length / 2;
-    m_hdimY = width / 2;
+    m_dimX = d["Patch dimensions"]["Length"].GetDouble();
+    m_dimY = d["Patch dimensions"]["Width"].GetDouble();
 
     m_radius_g = d["Granular material"]["Radius"].GetDouble();
     m_rho_g = d["Granular material"]["Density"].GetDouble();
@@ -249,10 +237,8 @@ void ChVehicleCosimTerrainNodeGranularGPU::Construct() {
     ////       Second, we are limited to creating this domain centered at the origin!?!
     float r = m_separation_factor * (float)m_radius_g;
     float delta = 2.0f * r;
-    float dimX = 2.0f * (float)m_hdimX;
-    float dimY = 2.0f * (float)m_hdimY;
     float dimZ = m_init_depth + EXTRA_HEIGHT;
-    auto box = ChVector<float>(dimX, dimY, dimZ);
+    auto box = ChVector<float>(m_dimX, m_dimY, dimZ);
 
     // Create granular system here
     m_systemGPU = new gpu::ChSystemGpuMesh((float)m_radius_g, (float)m_rho_g, box);
@@ -321,7 +307,7 @@ void ChVehicleCosimTerrainNodeGranularGPU::Construct() {
         }
 
         if (m_in_layers) {
-            ChVector<float> hdims(dimX / 2 - r, dimY / 2 - r, 0);
+            ChVector<float> hdims(m_dimX / 2 - r, m_dimY / 2 - r, 0);
             double z = delta;
             while (z < m_init_depth) {
                 auto p = sampler->SampleBox(ChVector<>(0, 0, z - dimZ / 2), hdims);
@@ -331,7 +317,7 @@ void ChVehicleCosimTerrainNodeGranularGPU::Construct() {
                 z += delta;
             }
         } else {
-            ChVector<> hdims(m_hdimX - r, m_hdimY - r, m_init_depth / 2 - r);
+            ChVector<> hdims(m_dimX / 2 - r, m_dimY / 2 - r, m_init_depth / 2 - r);
             auto p = sampler->SampleBox(ChVector<>(0, 0, m_init_depth / 2 - dimZ / 2), hdims);
             pos.insert(pos.end(), p.begin(), p.end());
         }
@@ -363,13 +349,12 @@ void ChVehicleCosimTerrainNodeGranularGPU::Construct() {
     m_systemGPU->Initialize();
 
     // Create bodies in Chrono system (visualization only)
-    if (m_render) {
+    if (m_renderRT) {
         for (const auto& p : pos) {
             auto body = std::shared_ptr<ChBody>(m_system->NewBody());
             body->SetPos(p);
             body->SetBodyFixed(true);
-            auto sph = chrono_types::make_shared<ChSphereShape>();
-            sph->GetSphereGeometry().rad = m_radius_g;
+            auto sph = chrono_types::make_shared<ChSphereShape>(m_radius_g);
             body->AddVisualShape(sph);
             m_system->AddBody(body);
         }
@@ -407,25 +392,11 @@ void ChVehicleCosimTerrainNodeGranularGPU::Construct() {
         trimesh_shape->SetName(filesystem::path(b.m_mesh_filename).stem());
         body->AddVisualShape(trimesh_shape, ChFrame<>());
 
-        m_system->AddBody(body);   
+        m_system->AddBody(body);
 
         // Set mesh for granular system
-        /*auto imesh =*/ m_systemGPU->AddMesh(trimesh, mass);
+        /*auto imesh =*/m_systemGPU->AddMesh(trimesh, mass);
     }
-
-#ifdef CHRONO_OPENGL
-    // Create the visualization window
-    if (m_render) {
-        m_vsys->AttachSystem(m_system);
-        m_vsys->SetWindowTitle("Terrain Node (GranularGPU)");
-        m_vsys->SetWindowSize(1280, 720);
-        m_vsys->SetRenderMode(opengl::WIREFRAME);
-        m_vsys->Initialize();
-        m_vsys->AddCamera(ChVector<>(0, -3, 0), ChVector<>(0, 0, 0));
-        m_vsys->SetCameraProperties(0.05f);
-        m_vsys->SetCameraVertical(CameraVerticalDir::Z);
-    }
-#endif
 
     // Write file with terrain node settings
     std::ofstream outf;
@@ -433,7 +404,7 @@ void ChVehicleCosimTerrainNodeGranularGPU::Construct() {
     outf << "System settings" << endl;
     outf << "   Integration step size = " << m_step_size << endl;
     outf << "Terrain patch dimensions" << endl;
-    outf << "   X = " << 2 * m_hdimX << "  Y = " << 2 * m_hdimY << endl;
+    outf << "   X = " << m_dimX << "  Y = " << m_dimY << endl;
     outf << "Terrain material properties" << endl;
     auto mat = std::static_pointer_cast<ChMaterialSurfaceSMC>(m_material_terrain);
     outf << "   Coefficient of friction    = " << mat->GetKfriction() << endl;
@@ -476,11 +447,13 @@ void ChVehicleCosimTerrainNodeGranularGPU::Settle() {
 
     // Simulate settling of granular terrain
     int output_steps = (int)std::ceil(1 / (m_settling_fps * m_step_size));
+    int total_steps = (int)std::ceil(m_time_settling / m_step_size);
     int output_frame = 0;
     int n_contacts;
     int max_contacts = 0;
     unsigned long long int cum_contacts = 0;
-    double render_time = 0;
+
+    std::cout << "[Terrain node] START settling" << endl;
 
     int steps = 0;
     double time = 0;
@@ -489,7 +462,7 @@ void ChVehicleCosimTerrainNodeGranularGPU::Settle() {
         // Advance step
         m_timer.reset();
         m_timer.start();
-        if (m_render) {
+        if (m_renderRT) {
             m_system->DoStepDynamics(m_step_size);
         }
         m_systemGPU->AdvanceSimulation((float)m_step_size);
@@ -515,16 +488,14 @@ void ChVehicleCosimTerrainNodeGranularGPU::Settle() {
         }
 
         // Render (if enabled)
-        if (m_render && m_system->GetChTime() > render_time) {
-            Render(m_system->GetChTime());
-            render_time += std::max(m_render_step, m_step_size);
-        }
+        Render(m_step_size);
 
         steps++;
         time += m_step_size;
 
         // Stopping criteria
         if (m_fixed_settling_duration) {
+            ProgressBar(steps, total_steps);
             if (time >= m_time_settling) {
                 KE = m_systemGPU->GetParticlesKineticEnergy();
                 break;
@@ -536,10 +507,8 @@ void ChVehicleCosimTerrainNodeGranularGPU::Settle() {
         }
     }
 
-    if (m_verbose) {
         cout << endl;
         cout << "[Terrain node] settling time = " << m_cum_sim_time << endl;
-    }
 
     // Find "height" of granular material after settling
     m_init_height = m_systemGPU->GetMaxParticleZ() + m_radius_g;
@@ -588,7 +557,7 @@ double ChVehicleCosimTerrainNodeGranularGPU::CalculatePackingDensity(double& dep
     depth = z_max - z_min;
 
     // Find total volume of granular material
-    double Vt = (2 * m_hdimX) * (2 * m_hdimY) * (z_max - z_min);
+    double Vt = m_dimX * m_dimY * (z_max - z_min);
 
     // Find volume of granular particles
     double Vs = m_num_particles * (4.0 / 3) * CH_C_PI * std::pow(m_radius_g, 3);
@@ -655,8 +624,11 @@ void ChVehicleCosimTerrainNodeGranularGPU::SetMatPropertiesExternal(unsigned int
 // -----------------------------------------------------------------------------
 
 void ChVehicleCosimTerrainNodeGranularGPU::CreateRigidProxy(unsigned int i) {
-    // Number of rigid obstacles
-    auto num_obstacles = m_obstacles.size();
+    // Get shape associated with the given object
+    int i_shape = m_obj_map[i];
+
+    // Create the proxy associated with the given object
+    auto proxy = chrono_types::make_shared<ProxyBodySet>();
 
     auto body = std::shared_ptr<ChBody>(m_system->NewBody());
     body->SetIdentifier(0);
@@ -665,13 +637,11 @@ void ChVehicleCosimTerrainNodeGranularGPU::CreateRigidProxy(unsigned int i) {
     body->SetBodyFixed(m_fixed_proxies);
     body->SetCollide(true);
 
-    // Get shape associated with the given object
-    int i_shape = m_obj_map[i];
-
     // Create visualization asset (use collision shapes)
     m_geometry[i_shape].CreateVisualizationAssets(body, VisualizationType::PRIMITIVES, true);
 
     // Create collision shapes (only if obstacles are present)
+    auto num_obstacles = m_obstacles.size();
     if (num_obstacles > 0) {
         for (auto& mesh : m_geometry[i_shape].m_coll_meshes)
             mesh.m_radius = m_radius_g;
@@ -681,8 +651,10 @@ void ChVehicleCosimTerrainNodeGranularGPU::CreateRigidProxy(unsigned int i) {
     }
 
     m_system->AddBody(body);
-    m_proxies[i].push_back(ProxyBody(body, 0));
-    
+    proxy->AddBody(body, 0);
+
+    m_proxies[i] = proxy;
+
     // Set mesh for granular system
     //// RADU TODO: what about other collision primitives?!?
     for (auto& mesh : m_geometry[i_shape].m_coll_meshes) {
@@ -699,14 +671,51 @@ void ChVehicleCosimTerrainNodeGranularGPU::CreateRigidProxy(unsigned int i) {
     m_systemGPU->InitializeMeshes();
 }
 
+// Once all proxy bodies are created, complete construction of the underlying system.
+void ChVehicleCosimTerrainNodeGranularGPU::OnInitialize(unsigned int num_objects) {
+    ChVehicleCosimTerrainNodeChrono::OnInitialize(num_objects);
+
+    // Create the visualization window
+    if (m_renderRT) {
+#if defined(CHRONO_VSG)
+        auto vsys_vsg = chrono_types::make_shared<vsg3d::ChVisualSystemVSG>();
+        vsys_vsg->AttachSystem(m_system);
+        vsys_vsg->SetWindowTitle("Terrain Node (GranularGPU)");
+        vsys_vsg->SetWindowSize(ChVector2<int>(1280, 720));
+        vsys_vsg->SetWindowPosition(ChVector2<int>(100, 100));
+        vsys_vsg->SetUseSkyBox(false);
+        vsys_vsg->SetClearColor(ChColor(0.455f, 0.525f, 0.640f));
+        vsys_vsg->AddCamera(m_cam_pos, ChVector<>(0, 0, 0));
+        vsys_vsg->SetCameraAngleDeg(40);
+        vsys_vsg->SetLightIntensity(1.0f);
+        vsys_vsg->SetImageOutputDirectory(m_node_out_dir + "/images");
+        vsys_vsg->SetImageOutput(m_writeRT);
+        vsys_vsg->Initialize();
+
+        m_vsys = vsys_vsg;
+#elif defined(CHRONO_OPENGL)
+        auto vsys_gl = chrono_types::make_shared<opengl::ChVisualSystemOpenGL>();
+        vsys_gl->AttachSystem(m_system);
+        vsys_gl->SetWindowTitle("Terrain Node (GranularGPU)");
+        vsys_gl->SetWindowSize(1280, 720);
+        vsys_gl->SetRenderMode(opengl::WIREFRAME);
+        vsys_gl->Initialize();
+        vsys_gl->AddCamera(m_cam_pos, ChVector<>(0, 0, 0));
+        vsys_gl->SetCameraProperties(0.05f);
+        vsys_gl->SetCameraVertical(CameraVerticalDir::Z);
+
+        m_vsys = vsys_gl;
+#endif
+    }
+}
+
 // Set state of proxy rigid body.
 void ChVehicleCosimTerrainNodeGranularGPU::UpdateRigidProxy(unsigned int i, BodyState& rigid_state) {
-    auto& proxies = m_proxies[i];  // proxies for the i-th object
-
-    proxies[0].m_body->SetPos(rigid_state.pos);
-    proxies[0].m_body->SetPos_dt(rigid_state.lin_vel);
-    proxies[0].m_body->SetRot(rigid_state.rot);
-    proxies[0].m_body->SetWvel_par(rigid_state.ang_vel);
+    auto proxy = std::static_pointer_cast<ProxyBodySet>(m_proxies[i]);
+    proxy->bodies[0]->SetPos(rigid_state.pos);
+    proxy->bodies[0]->SetPos_dt(rigid_state.lin_vel);
+    proxy->bodies[0]->SetRot(rigid_state.rot);
+    proxy->bodies[0]->SetWvel_par(rigid_state.ang_vel);
 
     m_systemGPU->ApplyMeshMotion(i, rigid_state.pos, rigid_state.rot, rigid_state.lin_vel, rigid_state.ang_vel);
 }
@@ -728,7 +737,7 @@ void ChVehicleCosimTerrainNodeGranularGPU::OnAdvance(double step_size) {
     double t = 0;
     while (t < step_size) {
         double h = std::min<>(m_step_size, step_size - t);
-        if (m_render) {
+        if (m_renderRT) {
             m_system->DoStepDynamics(h);
         }
         m_systemGPU->AdvanceSimulation((float)h);
@@ -736,22 +745,22 @@ void ChVehicleCosimTerrainNodeGranularGPU::OnAdvance(double step_size) {
     }
 }
 
-void ChVehicleCosimTerrainNodeGranularGPU::Render(double time) {
+void ChVehicleCosimTerrainNodeGranularGPU::OnRender() {
 #ifdef CHRONO_OPENGL
-    if (m_vsys->Run()) {
-        UpdateVisualizationParticles();
-        if (!m_proxies.empty()) {
-            const auto& proxies = m_proxies[0];  // proxies for first object
-            if (!proxies.empty()) {
-                ChVector<> cam_point = proxies[0].m_body->GetPos();
-                ChVector<> cam_loc = cam_point + ChVector<>(0, -3, 0.6);
-                m_vsys->UpdateCamera(cam_loc, cam_point);
-            }
-        }
-        m_vsys->Render();
-    } else {
+    if (!m_vsys)
+        return;
+    if (!m_vsys->Run())
         MPI_Abort(MPI_COMM_WORLD, 1);
+
+    UpdateVisualizationParticles();
+
+    if (m_track && !m_proxies.empty()) {
+        auto proxy = std::static_pointer_cast<ProxyBodySet>(m_proxies[0]);  // proxy for first object
+        ChVector<> cam_point = proxy->bodies[0]->GetPos();                  // position of first body in proxy set
+        m_vsys->UpdateCamera(m_cam_pos, cam_point);
     }
+
+    m_vsys->Render();
 #endif
 }
 

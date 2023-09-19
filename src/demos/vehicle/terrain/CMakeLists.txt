@@ -3,17 +3,19 @@
 # These example programs require Irrlicht run-time visualization.
 #=============================================================================
 
-if(NOT ENABLE_MODULE_IRRLICHT AND NOT ENABLE_MODULE_VSG)
-    return()
-endif()
-
 #--------------------------------------------------------------
 # List all demos
 
-set(DEMOS
-    demo_VEH_DeformableSoil
-    demo_VEH_RigidTerrain
-)
+set(DEMOS "")
+
+if(ENABLE_MODULE_IRRLICHT OR ENABLE_MODULE_VSG)
+    set(DEMOS ${DEMOS}
+        demo_VEH_RigidTerrain_WheeledVehicle
+        demo_VEH_SCMTerrain_WheeledVehicle
+        demo_VEH_SCMTerrain_RigidTire
+        demo_VEH_SCMTerrain_TrackedVehicle
+    )
+endif()
 
 if(HAVE_OPENCRG AND ENABLE_MODULE_IRRLICHT)
     set(DEMOS ${DEMOS}
@@ -24,19 +26,29 @@ endif()
 if(HAVE_OPENCRG AND ENABLE_MODULE_VSG)
     set(DEMOS ${DEMOS}
         demo_VEH_CRGTerrain_VSG
+        demo_VEH_FEDA_Road
     )
 endif()
 
 if(ENABLE_MODULE_MULTICORE AND ENABLE_MODULE_OPENGL)
     set(DEMOS ${DEMOS}
-        demo_VEH_GranularTerrain
-        demo_VEH_MovingPatch
+        demo_VEH_GranularTerrain_RigidTire
+        demo_VEH_GranularTerrain_MovingPatch
     )
 endif()
 
-if(ENABLE_MODULE_PARDISO_MKL)
+if(ENABLE_MODULE_FSI AND (ENABLE_MODULE_OPENGL OR ENABLE_MODULE_VSG))
     set(DEMOS ${DEMOS}
-        demo_VEH_DeformableSoilAndTire
+        demo_VEH_SPHTerrain_Obstacles
+        demo_VEH_SPHTerrain_WheeledVehicle
+        demo_VEH_SPHTerrain_TrackedVehicle
+        demo_VEH_SPHTerrain_Viper
+    )
+endif()
+
+if(ENABLE_MODULE_PARDISO_MKL AND ENABLE_MODULE_IRRLICHT)
+    set(DEMOS ${DEMOS}
+        demo_VEH_SCMTerrain_FEATire
     )
 endif()
 
@@ -48,9 +60,10 @@ set(LINKER_FLAGS "${CH_LINKERFLAG_EXE}")
 list(APPEND LIBS "ChronoEngine")
 list(APPEND LIBS "ChronoEngine_vehicle")
 list(APPEND LIBS "ChronoModels_vehicle")
+list(APPEND LIBS "ChronoModels_robot")
 
 if(ENABLE_MODULE_IRRLICHT)
-    include_directories(${CH_IRRLICHTINC})
+    include_directories(${CH_IRRLICHT_INCLUDES})
     set(COMPILER_FLAGS "${COMPILER_FLAGS} ${CH_IRRLICHT_CXX_FLAGS}")
     list(APPEND LIBS "ChronoEngine_irrlicht")
     list(APPEND LIBS "ChronoEngine_vehicle_irrlicht")
@@ -70,6 +83,11 @@ if(ENABLE_MODULE_MULTICORE)
     list(APPEND LIBS "ChronoEngine_multicore")
 endif()
 
+if(ENABLE_MODULE_FSI)
+    include_directories(${CH_FSI_INCLUDES})
+    list(APPEND LIBS "ChronoEngine_fsi")
+endif()
+
 if(ENABLE_MODULE_PARDISO_MKL)
     include_directories(${CH_MKL_INCLUDES})
     set(COMPILER_FLAGS "${COMPILER_FLAGS} ${CH_MKL_CXX_FLAGS}")
@@ -85,6 +103,10 @@ endif()
 if(ENABLE_MODULE_OPENGL)
     include_directories(${CH_OPENGL_INCLUDES})
     list(APPEND LIBS "ChronoEngine_opengl")
+endif()
+
+if(ENABLE_MODULE_POSTPROCESS)
+    list(APPEND LIBS "ChronoEngine_postprocess")
 endif()
 
 #--------------------------------------------------------------
