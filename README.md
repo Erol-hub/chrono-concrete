@@ -290,7 +290,9 @@ Source for many of these instructions is Project Chrono documentation. More deta
 
 ## Questions
 
-All questions and suggestions should be directed to the Stackoverflow Teams forum located [here.](https://stackoverflowteams.com/c/concrete-chrono-development)
+All questions and suggestions should be directed to the Stackoverflow Teams forum.
+
+> #### [Chrono Concrete Forum](https://stackoverflowteams.com/c/concrete-chrono-development)
 
 ## Wiki, Details, and Examples
 
