@@ -288,7 +288,9 @@ Install CMake version 3.25.0. An installer for the [software is available for fr
 
 Source for many of these instructions is Project Chrono documentation. More details [here.](https://api.projectchrono.org/tutorial\_install\_chrono.html)
 
+## Questions
 
+All questions and suggestions should be directed to the Stackoverflow Teams forum located [here.](https://stackoverflowteams.com/c/concrete-chrono-development)
 
 ## Wiki, Details, and Examples
 
