@@ -175,7 +175,7 @@ class MyContactForce : public ChSystemSMC::ChContactForceSMC {
 		//
 		// Change material stiffness if aggregate to aggregate contact occurs
 		//
-		double E_eff=ENm*delta_new;
+		double E_eff=ENm;
 		if (delta_new>=h){
 			E_eff=ENa;
 			double r=Rmin-h;
