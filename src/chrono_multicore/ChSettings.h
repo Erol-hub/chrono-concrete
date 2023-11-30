@@ -215,6 +215,72 @@ class solver_settings {
     int skip_residual;
 };
 
+/// Parameters for Discrete Fresh Concrete (DFC) model, they are the same for each body
+/// in the system differentiating only between particles modelling fresh concrete (spheres)
+/// and boundary surfaces
+/// For reference see article: E. Ramyar and G. Cusatis, Discrete Fresh Concrete Model for
+/// Simulation of Ordinary, Self-Consolidating, and Printable Concrete Flow
+class dfc_parameters {
+  public:
+      dfc_parameters() {
+        E_Nm = 0.05;
+        E_Na = 10;
+        h = 2.5;
+        alfa_a = 0.25;
+        beta = 0.5;
+        sigma_t = 0.0025;
+        simga_tau0 = 50e-6;
+        eta_inf = 50e-6;
+        kappa_0 = 100;
+        n = 1;
+        mi_a = 0.5;
+        E_Nm_s = 0.05;
+        E_Na_s = 10;
+        alfa_a_s = 0.25;
+        sigma_t_s = 0.0024;
+        simga_tau0_s = 50e-6;
+        eta_inf_s = 50e-6;
+        mi_a_s = 0.5;
+      }
+      /// Mortar to mortar and mortar to aggregate stiffness
+      real E_Nm;
+      /// Aggregate to aggregate stiffness
+      real E_Na;
+      /// Thickness of mortar layer around an aggregate
+      real h;
+      /// Normal-shear coupling parameter inside concrete
+      real alfa_a;
+      /// Parameter governing viscous behaviour in normal direction
+      real beta;
+      /// Tensile strength of mortar
+      real sigma_t;
+      /// Mortar shear yield stress
+      real simga_tau0;
+      /// Mortar plastic viscosity
+      real eta_inf;
+      /// Peanalty constant
+      real kappa_0;
+      /// Constant defining flow (n = 1 -> Newtonian, n > 1 -> shear-thickening,
+      /// n < 1 shear-thinning) 
+      real n;
+      /// Aggregate to aggregate friction coefficient
+      real mi_a;
+      /// Mortar to surface stiffness
+      real E_Nm_s;
+      /// Mortar to aggregate stiffness
+      real E_Na_s;
+      /// Normal-shear coupling parameter for concrete interaction with surface
+      real alfa_a_s;
+      /// Tensile strength of mortar interacting with surface
+      real sigma_t_s;
+      /// Mortar shear yield stress interacting with surface
+      real simga_tau0_s;
+      /// Mortar plastic viscosity interacting with surface
+      real eta_inf_s;
+      /// Aggregate to surface friction coefficient
+      real mi_a_s;
+};
+
 /// Aggregate of all settings for Chrono::Multicore.
 class settings_container {
   public:
@@ -232,6 +298,7 @@ class settings_container {
 
     collision_settings collision;  ///< settings for collision detection
     solver_settings solver;        ///< settings for iterative solver
+    dfc_parameters dfc_contact_param;   ///< settings for DFC contact force model
 
     real step_size;  ///< current integration step size
     real3 gravity;   ///< gravitational acceleration vector
