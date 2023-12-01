@@ -549,6 +549,125 @@ void function_CalcContactForces(
 }
 
 // -----------------------------------------------------------------------------
+// Main worker function for calculating contact forces. Calculates the contact
+// force and torque for the contact pair identified by 'index' and stores them
+// in the 'extended' output arrays. The calculated force and torque vectors are
+// therefore duplicated in the output arrays, once for each body involved in the
+// contact (with opposite signs for the two bodies).
+// -----------------------------------------------------------------------------
+void function_CalcDFCForces(int index,               // index of this contact pair
+                            vec2* body_pairs,        // indices of the body pair in contact
+                            vec2* shape_pairs,       // indices of the shape pair in contact
+                            real3* pos,              // body positions
+                            quaternion* rot,         // body orientations
+                            real* vel,               // body linear and angular velocities
+                            real3* pt1,              // point on shape 1 (per contact)
+                            real3* pt2,              // point on shape 2 (per contact)
+                            real3* normal,           // contact normal (per contact)
+                            real* depth,             // penetration depth (per contact)
+                            real3* radiuses,          // radiuses of contacting spheres (or -1 if other shape)
+                            vec3* cont_neigh,        // neighbor list of contacting bodies and shapes (per body)
+                            char* cont_touch,        // flag if contact in neighbor list is persistent (per body)
+                            real3* DFC_stress,       // accumulated shear displacement for each neighbor (per body)
+                            real* contact_duration,  // duration of persistent contact between contact pairs
+                            dfc_parameters& param,   // DFC parameters stored in one object
+                            int* ct_bid,             // [output] body IDs (two per contact)
+                            real3* ct_force,         // [output] body force (two per contact)
+                            real3* ct_torque         // [output] body torque (two per contact)
+) {
+    // Identify the two bodies in contact (global body IDs).
+    int b1 = body_pairs[index].x;
+    int b2 = body_pairs[index].y;
+
+    // If the two contact shapes are actually separated, set zero forces and torques.
+    if (depth[index] >= 0) {
+        ct_bid[2 * index] = b1;
+        ct_bid[2 * index + 1] = b2;
+        ct_force[2 * index] = real3(0);
+        ct_force[2 * index + 1] = real3(0);
+        ct_torque[2 * index] = real3(0);
+        ct_torque[2 * index + 1] = real3(0);
+        return;
+    }
+
+    // Identify the two shapes in contact (global shape IDs).
+    int s1 = shape_pairs[index].x;
+    int s2 = shape_pairs[index].y;
+
+    // Kinematic information
+    // ---------------------
+
+    // Express contact point locations in local frames
+    //   s' = At * s = At * (rP - r)
+    real3 pt1_loc = TransformParentToLocal(pos[b1], rot[b1], pt1[index]);
+    real3 pt2_loc = TransformParentToLocal(pos[b2], rot[b2], pt2[index]);
+
+    // Calculate velocities of the contact points (in global frame)
+    //   vP = v + omg x s = v + A * (omg' x s')
+    real3 v_body1 = real3(vel[b1 * 6 + 0], vel[b1 * 6 + 1], vel[b1 * 6 + 2]);
+    real3 v_body2 = real3(vel[b2 * 6 + 0], vel[b2 * 6 + 1], vel[b2 * 6 + 2]);
+
+    real3 o_body1 = real3(vel[b1 * 6 + 3], vel[b1 * 6 + 4], vel[b1 * 6 + 5]);
+    real3 o_body2 = real3(vel[b2 * 6 + 3], vel[b2 * 6 + 4], vel[b2 * 6 + 5]);
+
+    real3 vel1 = v_body1 + Rotate(Cross(o_body1, pt1_loc), rot[b1]);
+    real3 vel2 = v_body2 + Rotate(Cross(o_body2, pt2_loc), rot[b2]);
+
+    // Calculate relative velocity (in global frame)
+    // Note that relvel_n_mag is a signed quantity, while relvel_t_mag is an
+    // actual magnitude (always positive).
+    real3 relvel = vel2 - vel1;
+    real relvel_n_mag = Dot(relvel, normal[index]);
+    real3 relvel_n = relvel_n_mag * normal[index];
+    real3 relvel_t = relvel - relvel_n;
+    real relvel_t_mag = Length(relvel_t);
+
+    // Extract composite material properties
+    // -------------------------------------
+
+
+
+    // Contact force
+    // -------------
+
+    // All models use the following formulas for normal and tangential forces:
+    //     Fn = kn * delta_n - gn * v_n
+    //     Ft = kt * delta_t - gt * v_t
+    // The stiffness and damping coefficients are obtained differently, based
+    // on the force model and on how coefficients are specified.
+    real kn = 0;
+    real kt = 0;
+    real gn = 0;
+    real gt = 0;
+    real kn_simple = 0;
+    real gn_simple = 0;
+
+    real t_contact = 0;
+    real relvel_init = abs(relvel_n_mag);
+    real delta_n = -depth[index];
+    real3 delta_t = real3(0);
+
+    int i;
+    int contact_id = -1;
+    int shear_body1 = -1;
+    int shear_body2;
+    int shear_shape1;
+    int shear_shape2;
+    bool newcontact = true;
+    GetLog() << "The following is a debug information for DFC contact force model \n";
+    GetLog() << "This is a contact of body 1 and body 2 with following indexes: " << b1 << " " << b2 << "\n";
+    GetLog() << "In this contact following shape 1 and shape 2 are involved: " << s1 << " " << s2 << "\n";
+    GetLog() << "Radiuses of the contacting shape 1 and shape 2 are: " << radiuses[0] << " " << radiuses[1] << "\n";
+    ct_bid[2 * index] = b1;
+    ct_bid[2 * index + 1] = b2;
+    ct_force[2 * index] = real3(0);
+    ct_force[2 * index + 1] = real3(0);
+    ct_torque[2 * index] = real3(0);
+    ct_torque[2 * index + 1] = real3(0);
+    return;
+}
+
+// -----------------------------------------------------------------------------
 // Calculate contact forces and torques for all contact pairs.
 // -----------------------------------------------------------------------------
 
@@ -559,42 +678,66 @@ void ChIterativeSolverMulticoreSMC::host_CalcContactForces(custom_vector<int>& c
                                                            custom_vector<char>& shear_touch) {
 #pragma omp parallel for
     for (int index = 0; index < (signed)data_manager->cd_data->num_rigid_contacts; index++) {
-        function_CalcContactForces(
-            index,                                                  // index of this contact pair
-            data_manager->cd_data->bids_rigid_rigid.data(),         // indices of the body pair in contact
-            shape_pairs.data(),                                     // indices of the shape pair in contact
-            data_manager->settings.solver.contact_force_model,      // contact force model
-            data_manager->settings.solver.adhesion_force_model,     // adhesion force model
-            data_manager->settings.solver.tangential_displ_mode,    // type of tangential displacement history
-            data_manager->settings.solver.use_material_properties,  // flag specifying how coefficients are obtained
-            data_manager->settings.solver.characteristic_vel,       // characteristic velocity (Hooke)
-            data_manager->settings.solver.min_slip_vel,             // threshold tangential velocity
-            data_manager->settings.solver.min_roll_vel,             // threshold rolling velocity
-            data_manager->settings.solver.min_spin_vel,             // threshold spinning velocity
-            data_manager->settings.step_size,                       // integration time step
-            data_manager->host_data.mass_rigid.data(),              // body masses
-            data_manager->host_data.pos_rigid.data(),               // body positions
-            data_manager->host_data.rot_rigid.data(),               // body orientations
-            data_manager->host_data.v.data(),                       // body linear and angular velocities
-            data_manager->host_data.fric_rigid_rigid.data(),        // eff. coefficients of friction (per contact)
-            data_manager->host_data.modulus_rigid_rigid.data(),     // eff. elasticity and shear modulus (per contact)
-            data_manager->host_data.adhesion_rigid_rigid.data(),    // eff. adhesion paramters (per contact)
-            data_manager->host_data.cr_rigid_rigid.data(),          // eff. coefficient of restitution (per contact)
-            data_manager->host_data.smc_rigid_rigid.data(),         // eff. SMC parameters k and g (per contact)
-            data_manager->cd_data->cpta_rigid_rigid.data(),         // point on shape 1 (per contact)
-            data_manager->cd_data->cptb_rigid_rigid.data(),         // point on shape 2 (per contact)
-            data_manager->cd_data->norm_rigid_rigid.data(),         // contact normal (per contact)
-            data_manager->cd_data->dpth_rigid_rigid.data(),         // penetration depth (per contact)
-            data_manager->cd_data->erad_rigid_rigid.data(),         // effective contact radius (per contact)
-            data_manager->host_data.shear_neigh.data(),  // neighbor list of contacting bodies and shapes (per body)
-            shear_touch.data(),                          // flag if contact in neighbor list is persistent (per body)
-            data_manager->host_data.shear_disp.data(),   // accumulated shear displacement for each neighbor (per body)
-            data_manager->host_data.contact_relvel_init.data(),  // initial relative normal velocity per contact pair
-            data_manager->host_data.contact_duration.data(),     // duration of persistent contact between contact pairs
-            ct_bid.data(),                                       // [output] body IDs (two per contact)
-            ct_force.data(),                                     // [output] body force (two per contact)
-            ct_torque.data()                                     // [output] body torque (two per contact)
-        );
+        if (data_manager->settings.solver.tangential_displ_mode == ChSystemSMC::ContactForceModel::DFC) {
+            function_CalcDFCForces(
+                index,                                             // index of this contact pair
+                data_manager->cd_data->bids_rigid_rigid.data(),    // indices of the body pair in contact
+                shape_pairs.data(),                                 // indices of the shape pair in contact
+                data_manager->host_data.pos_rigid.data(),          // body positions
+                data_manager->host_data.rot_rigid.data(),          // body orientations
+                data_manager->host_data.v.data(),                  // body linear and angular velocities
+                data_manager->cd_data->cpta_rigid_rigid.data(),    // point on shape 1 (per contact)
+                data_manager->cd_data->cptb_rigid_rigid.data(),    // point on shape 2 (per contact)
+                data_manager->cd_data->norm_rigid_rigid.data(),    // contact normal (per contact)
+                data_manager->cd_data->dpth_rigid_rigid.data(),    // penetration depth (per contact)
+                data_manager->cd_data->radius_rigid_rigid.data(),  // radiuses of contacting spheres (-1 if other shape)
+                data_manager->host_data.shear_neigh.data(),         // neighbor list of contacting bodies and shapes (per body)
+                shear_touch.data(),                                 // flag if contact in neighbor list is persistent (per body)
+                data_manager->host_data.shear_disp.data(),          // accumulated stresses (variable name left from other contact force model)
+                data_manager->host_data.contact_duration.data(),  // duration of persistent contact between contact pairs
+                data_manager->settings.dfc_contact_param,         // DFC contact parameters
+                ct_bid.data(),                                      // [output] body IDs (two per contact)
+                ct_force.data(),                                    // [output] body force (two per contact)
+                ct_torque.data()                                    // [output] body torque (two per contact)
+            );
+        } else {
+            function_CalcContactForces(
+                index,                                                  // index of this contact pair
+                data_manager->cd_data->bids_rigid_rigid.data(),         // indices of the body pair in contact
+                shape_pairs.data(),                                     // indices of the shape pair in contact
+                data_manager->settings.solver.contact_force_model,      // contact force model
+                data_manager->settings.solver.adhesion_force_model,     // adhesion force model
+                data_manager->settings.solver.tangential_displ_mode,    // type of tangential displacement history
+                data_manager->settings.solver.use_material_properties,  // flag specifying how coefficients are obtained
+                data_manager->settings.solver.characteristic_vel,       // characteristic velocity (Hooke)
+                data_manager->settings.solver.min_slip_vel,             // threshold tangential velocity
+                data_manager->settings.solver.min_roll_vel,             // threshold rolling velocity
+                data_manager->settings.solver.min_spin_vel,             // threshold spinning velocity
+                data_manager->settings.step_size,                       // integration time step
+                data_manager->host_data.mass_rigid.data(),              // body masses
+                data_manager->host_data.pos_rigid.data(),               // body positions
+                data_manager->host_data.rot_rigid.data(),               // body orientations
+                data_manager->host_data.v.data(),                       // body linear and angular velocities
+                data_manager->host_data.fric_rigid_rigid.data(),        // eff. coefficients of friction (per contact)
+                data_manager->host_data.modulus_rigid_rigid.data(),   // eff. elasticity and shear modulus (per contact)
+                data_manager->host_data.adhesion_rigid_rigid.data(),  // eff. adhesion paramters (per contact)
+                data_manager->host_data.cr_rigid_rigid.data(),        // eff. coefficient of restitution (per contact)
+                data_manager->host_data.smc_rigid_rigid.data(),       // eff. SMC parameters k and g (per contact)
+                data_manager->cd_data->cpta_rigid_rigid.data(),       // point on shape 1 (per contact)
+                data_manager->cd_data->cptb_rigid_rigid.data(),       // point on shape 2 (per contact)
+                data_manager->cd_data->norm_rigid_rigid.data(),       // contact normal (per contact)
+                data_manager->cd_data->dpth_rigid_rigid.data(),       // penetration depth (per contact)
+                data_manager->cd_data->erad_rigid_rigid.data(),       // effective contact radius (per contact)
+                data_manager->host_data.shear_neigh.data(),  // neighbor list of contacting bodies and shapes (per body)
+                shear_touch.data(),  // flag if contact in neighbor list is persistent (per body)
+                data_manager->host_data.shear_disp.data(),  // accumulated shear displacement for each neighbor (per body)
+                data_manager->host_data.contact_relvel_init.data(),  // initial relative normal velocity per contact pair
+                data_manager->host_data.contact_duration.data(),      // duration of persistent contact between contact pairs
+                ct_bid.data(),    // [output] body IDs (two per contact)
+                ct_force.data(),  // [output] body force (two per contact)
+                ct_torque.data()  // [output] body torque (two per contact)
+            );
+        }
     }
 }
 
