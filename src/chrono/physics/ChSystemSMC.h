@@ -34,7 +34,8 @@ class ChApi ChSystemSMC : public ChSystem {
         Hooke,         ///< linear Hookean model
         Hertz,         ///< nonlinear Hertzian model
         PlainCoulomb,  ///< basic tangential force definition for non-granular bodies
-        Flores         ///< nonlinear Hertzian model
+        Flores,         ///< nonlinear Hertzian model
+        DFC             /// Discrete Fresh Concrete (contact force model for concrete modelling)
     };
 
     /// Enum for adhesion force model.
