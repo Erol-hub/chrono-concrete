@@ -117,7 +117,8 @@ class CH_MULTICORE_API ChIterativeSolverMulticoreSMC : public ChIterativeSolverM
                                 custom_vector<real3>& ct_force,
                                 custom_vector<real3>& ct_torque,
                                 custom_vector<vec2>& shape_pairs,
-                                custom_vector<char>& shear_touch);
+                                custom_vector<char>& shear_touch,
+                                custom_vector<real3>& shape_radiuses);
 
     void host_AddContactForces(uint ct_body_count, const custom_vector<int>& ct_body_id);
 

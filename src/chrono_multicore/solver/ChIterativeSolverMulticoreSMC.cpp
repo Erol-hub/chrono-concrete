@@ -657,7 +657,7 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     GetLog() << "The following is a debug information for DFC contact force model \n";
     GetLog() << "This is a contact of body 1 and body 2 with following indexes: " << b1 << " " << b2 << "\n";
     GetLog() << "In this contact following shape 1 and shape 2 are involved: " << s1 << " " << s2 << "\n";
-    GetLog() << "Radiuses of the contacting shape 1 and shape 2 are: " << radiuses[0] << " " << radiuses[1] << "\n";
+    GetLog() << "Radiuses of the contacting shape 1 and shape 2 are: " << radiuses[index].x << " " << radiuses[index].y << "\n";
     ct_bid[2 * index] = b1;
     ct_bid[2 * index + 1] = b2;
     ct_force[2 * index] = real3(0);
@@ -675,7 +675,8 @@ void ChIterativeSolverMulticoreSMC::host_CalcContactForces(custom_vector<int>& c
                                                            custom_vector<real3>& ct_force,
                                                            custom_vector<real3>& ct_torque,
                                                            custom_vector<vec2>& shape_pairs,
-                                                           custom_vector<char>& shear_touch) {
+                                                           custom_vector<char>& shear_touch,
+                                                           custom_vector<real3>& shape_radiuses) {
 #pragma omp parallel for
     for (int index = 0; index < (signed)data_manager->cd_data->num_rigid_contacts; index++) {
         if (data_manager->settings.solver.contact_force_model == ChSystemSMC::ContactForceModel::DFC) {
@@ -690,7 +691,7 @@ void ChIterativeSolverMulticoreSMC::host_CalcContactForces(custom_vector<int>& c
                 data_manager->cd_data->cptb_rigid_rigid.data(),    // point on shape 2 (per contact)
                 data_manager->cd_data->norm_rigid_rigid.data(),    // contact normal (per contact)
                 data_manager->cd_data->dpth_rigid_rigid.data(),    // penetration depth (per contact)
-                data_manager->cd_data->radius_rigid_rigid.data(),  // radiuses of contacting spheres (-1 if other shape)
+                shape_radiuses.data(),                             // radiuses of contacting spheres (-1 if other shape)
                 data_manager->host_data.shear_neigh.data(),         // neighbor list of contacting bodies and shapes (per body)
                 shear_touch.data(),                                 // flag if contact in neighbor list is persistent (per body)
                 data_manager->host_data.shear_disp.data(),          // accumulated stresses (variable name left from other contact force model)
@@ -804,10 +805,12 @@ void ChIterativeSolverMulticoreSMC::ProcessContacts() {
 
     // Set up additional vectors for multi-step tangential model
     custom_vector<vec2> shape_pairs;
+    custom_vector<real3> shape_radiuses;
     custom_vector<char> shear_touch;
     if (data_manager->settings.solver.tangential_displ_mode == ChSystemSMC::TangentialDisplacementModel::MultiStep ||
         data_manager->settings.solver.contact_force_model == ChSystemSMC::ContactForceModel::DFC) {
         shape_pairs.resize(num_rigid_contacts);
+        shape_radiuses.resize(num_rigid_contacts);
         shear_touch.resize(max_shear * data_manager->num_rigid_bodies);
         Thrust_Fill(shear_touch, false);
 #pragma omp parallel for
@@ -815,10 +818,23 @@ void ChIterativeSolverMulticoreSMC::ProcessContacts() {
             vec2 pair = I2(int(data_manager->cd_data->contact_shapeIDs[i] >> 32),
                            int(data_manager->cd_data->contact_shapeIDs[i] & 0xffffffff));
             shape_pairs[i] = pair;
+            double temp_R1;
+            double temp_R2;
+            if (data_manager->cd_data->shape_data.typ_rigid[pair.x] == 0) {
+                temp_R1 = data_manager->cd_data->shape_data.sphere_rigid[pair.x];
+            } else {
+                temp_R1 = -1;
+            }
+            if (data_manager->cd_data->shape_data.typ_rigid[pair.y] == 0) {
+                temp_R2 = data_manager->cd_data->shape_data.sphere_rigid[pair.y];
+            } else {
+                temp_R2 = -1;
+            }
+            shape_radiuses[i] = (real3(temp_R1, temp_R2, 0));
         }
     }
 
-    host_CalcContactForces(ct_bid, ct_force, ct_torque, shape_pairs, shear_touch);
+    host_CalcContactForces(ct_bid, ct_force, ct_torque, shape_pairs, shear_touch, shape_radiuses);
 
     data_manager->host_data.ct_force.resize(2 * num_rigid_contacts);
     data_manager->host_data.ct_torque.resize(2 * num_rigid_contacts);
