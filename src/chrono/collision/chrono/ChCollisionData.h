@@ -170,7 +170,6 @@ class ChApi ChCollisionData {
     std::vector<real> dpth_rigid_rigid;   ///< [num_rigid_contacts] penetration depth for each rigid-rigid contact
     std::vector<real> erad_rigid_rigid;  ///< [num_rigid_contacts] effective contact radius for each rigid-rigid contact
     std::vector<vec2> bids_rigid_rigid;  ///< [num_rigid_contacts] body IDs for each rigid-rigid contact pair
-    std::vector<real3> radius_rigid_rigid;   // [num_rigid_contacts] radiuses of contacting bodies, -1 if radius cannot be determined
 
     // Rigid-particle geometric collision data
     std::vector<real3> norm_rigid_fluid;    ///< [num_rigid_fluid_contacts]

@@ -237,20 +237,6 @@ void ChCollisionSystemBulletMulticore::ReportContacts(ChContactContainer* mconta
                         data_manager->cd_data->bids_rigid_rigid.push_back(
                             I2(obA->getCompanionId(), obB->getCompanionId()));
                         data_manager->cd_data->num_rigid_contacts++;
-                        double temp_R1;
-                        double temp_R2;
-                        if (icontact.shapeA->GetType() == 0) {
-                            temp_R1 = icontact.modelA->GetShapeDimensions(indexA)[0];
-                        }
-                        else {
-                            temp_R1 = -1;
-                        }
-                        if (icontact.shapeB->GetType() == 0) {
-                            temp_R2 = icontact.modelB->GetShapeDimensions(indexB)[0];
-                        } else {
-                            temp_R2 = -1;
-                        }
-                        data_manager->cd_data->radius_rigid_rigid.push_back(real3(temp_R1, temp_R2, 0));
                     }
                 }
             }
