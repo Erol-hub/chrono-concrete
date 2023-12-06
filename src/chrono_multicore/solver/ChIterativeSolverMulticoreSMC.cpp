@@ -678,7 +678,7 @@ void ChIterativeSolverMulticoreSMC::host_CalcContactForces(custom_vector<int>& c
                                                            custom_vector<char>& shear_touch) {
 #pragma omp parallel for
     for (int index = 0; index < (signed)data_manager->cd_data->num_rigid_contacts; index++) {
-        if (data_manager->settings.solver.tangential_displ_mode == ChSystemSMC::ContactForceModel::DFC) {
+        if (data_manager->settings.solver.contact_force_model == ChSystemSMC::ContactForceModel::DFC) {
             function_CalcDFCForces(
                 index,                                             // index of this contact pair
                 data_manager->cd_data->bids_rigid_rigid.data(),    // indices of the body pair in contact
@@ -805,7 +805,8 @@ void ChIterativeSolverMulticoreSMC::ProcessContacts() {
     // Set up additional vectors for multi-step tangential model
     custom_vector<vec2> shape_pairs;
     custom_vector<char> shear_touch;
-    if (data_manager->settings.solver.tangential_displ_mode == ChSystemSMC::TangentialDisplacementModel::MultiStep) {
+    if (data_manager->settings.solver.tangential_displ_mode == ChSystemSMC::TangentialDisplacementModel::MultiStep ||
+        data_manager->settings.solver.contact_force_model == ChSystemSMC::ContactForceModel::DFC) {
         shape_pairs.resize(num_rigid_contacts);
         shear_touch.resize(max_shear * data_manager->num_rigid_bodies);
         Thrust_Fill(shear_touch, false);
