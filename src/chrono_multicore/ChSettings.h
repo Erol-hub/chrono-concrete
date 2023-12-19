@@ -223,24 +223,25 @@ class solver_settings {
 class dfc_parameters {
   public:
       dfc_parameters() {
-        E_Nm = 0.05;
-        E_Na = 10;
-        h = 2.5;
+        E_Nm = 0.05e6;
+        E_Na = 100e6;
+        h = 2.5e-3;
         alfa_a = 0.25;
         beta = 0.5;
-        sigma_t = 0.0025;
-        simga_tau0 = 50e-6;
-        eta_inf = 50e-6;
+        sigma_t = 0.0025e6;
+        sigma_tau0 = 50;
+        eta_inf = 50;
         kappa_0 = 100;
         n = 1;
         mi_a = 0.5;
-        E_Nm_s = 0.05;
-        E_Na_s = 10;
+        E_Nm_s = 0.05e6;
+        E_Na_s = 100e6;
         alfa_a_s = 0.25;
-        sigma_t_s = 0.0024;
-        simga_tau0_s = 50e-6;
-        eta_inf_s = 50e-6;
+        sigma_t_s = 0.0024e6;
+        sigma_tau0_s = 50;
+        eta_inf_s = 50;
         mi_a_s = 0.5;
+        t = 2.5e-3;
       }
       /// Mortar to mortar and mortar to aggregate stiffness
       real E_Nm;
@@ -255,7 +256,7 @@ class dfc_parameters {
       /// Tensile strength of mortar
       real sigma_t;
       /// Mortar shear yield stress
-      real simga_tau0;
+      real sigma_tau0;
       /// Mortar plastic viscosity
       real eta_inf;
       /// Peanalty constant
@@ -274,11 +275,13 @@ class dfc_parameters {
       /// Tensile strength of mortar interacting with surface
       real sigma_t_s;
       /// Mortar shear yield stress interacting with surface
-      real simga_tau0_s;
+      real sigma_tau0_s;
       /// Mortar plastic viscosity interacting with surface
       real eta_inf_s;
       /// Aggregate to surface friction coefficient
       real mi_a_s;
+      /// thickness of mortar layer on surfaces
+      real t;
 };
 
 /// Aggregate of all settings for Chrono::Multicore.

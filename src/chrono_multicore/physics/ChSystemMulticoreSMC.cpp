@@ -48,6 +48,12 @@ void ChSystemMulticoreSMC::AddMaterialSurfaceData(std::shared_ptr<ChBody> newbod
             data_manager->host_data.contact_duration.push_back(0);
         }
     }
+    if (data_manager->settings.solver.contact_force_model == ChSystemSMC::ContactForceModel::DFC) {
+        for (int i = 0; i < max_shear; i++) {
+            data_manager->host_data.shear_neigh.push_back(vec3(-1, -1, -1));
+            data_manager->host_data.shear_disp.push_back(real3(0, 0, 0));
+        }
+    }
 }
 
 void ChSystemMulticoreSMC::UpdateMaterialSurfaceData(int index, ChBody* body) {

@@ -105,9 +105,11 @@ std::vector<std::shared_ptr<ChBody>> AddBalls(ChSystemMulticore& sys, int ball_n
     collision::ChCollisionModel::SetDefaultSuggestedEnvelope(0.004);
 
     double gap_between_sphere_1_2 = 0.000;
+    double h = 2.5e-3;
 
     // Define balls
     double radius = 0.01;                                          // in meters, I have doubt about used units
+    double density = 797 / (1 + 0.4 + 2.25);
     double mass = ((4.0 / 3.0) * 3.1415 * pow(radius, 3)) * 1000;  // calculated (volume, density), in kg, average
     for (int i = 0; i < ball_number; i++) {
         //auto ball = chrono_types::make_shared<ChBody>();
@@ -119,7 +121,7 @@ std::vector<std::shared_ptr<ChBody>> AddBalls(ChSystemMulticore& sys, int ball_n
             ball->SetPos(chrono::ChVector<>(0, 0, 0));
             ball->SetPos_dt(chrono::ChVector<>(initial_velocity, 0, 0));
         } else {
-            ball->SetPos(chrono::ChVector<>(i *( 2 * radius - radius/2 ) + gap_between_sphere_1_2, 0, 0));
+            ball->SetPos(chrono::ChVector<>(i *( 2 * radius - h ) + gap_between_sphere_1_2, 0, 0));
             ball->SetPos_dt(chrono::ChVector<>(0, 0, 0));
         }
         ball->GetCollisionModel()->ClearModel();  // CollisionModel is a class which defines the geometric model used
@@ -131,8 +133,8 @@ std::vector<std::shared_ptr<ChBody>> AddBalls(ChSystemMulticore& sys, int ball_n
         auto sphere1 = chrono_types::make_shared<ChSphereShape>(radius);
         sphere1->SetTexture(GetChronoDataFile("textures/bluewhite.png"));
         sphere1->SetOpacity(0.4f);
-        auto sphere2 = chrono_types::make_shared<ChSphereShape>(radius/2);
-        sphere2->SetTexture(GetChronoDataFile("textures/rock.png"));
+        auto sphere2 = chrono_types::make_shared<ChSphereShape>(radius - h);
+        sphere2->SetTexture(GetChronoDataFile("textures/rock.jpg"));
         auto ball_vis = chrono_types::make_shared<ChVisualModel>();
         ball_vis->AddShape(sphere1);
         ball_vis->AddShape(sphere2);
@@ -175,12 +177,34 @@ int main(int argc, char* argv[]) {
     sys.GetSettings()->collision.narrowphase_algorithm = chrono::collision::ChNarrowphase::Algorithm::HYBRID;
     sys.GetSettings()->collision.bins_per_axis = chrono::vec3(10, 10, 10);
 
+    // Set DFC contact model parameters
+    sys.GetSettings()->dfc_contact_param.E_Nm = 0.05e6; /// Mortar to mortar and mortar to aggregate stiffness
+    sys.GetSettings()->dfc_contact_param.E_Na = 100e6;  /// Aggregate to aggregate stiffness
+    sys.GetSettings()->dfc_contact_param.h = 2.5e-3;    /// Thickness of mortar layer around an aggregate
+    sys.GetSettings()->dfc_contact_param.alfa_a = 0.25; /// Normal-shear coupling parameter inside concrete
+    sys.GetSettings()->dfc_contact_param.beta = 0.5;    /// Parameter governing viscous behaviour in normal direction
+    sys.GetSettings()->dfc_contact_param.sigma_t = 0.0025e6;    /// Tensile strength of mortar
+    sys.GetSettings()->dfc_contact_param.sigma_tau0 = 50;   /// Mortar shear yield stress
+    sys.GetSettings()->dfc_contact_param.eta_inf = 50;  /// Mortar plastic viscosity
+    sys.GetSettings()->dfc_contact_param.kappa_0 = 100; /// Peanalty constant
+    sys.GetSettings()->dfc_contact_param.n = 1;       /// Constant defining flow (n = 1 -> Newtonian, n > 1 -> shear-thickening,
+      /// n < 1 shear-thinning)
+    sys.GetSettings()->dfc_contact_param.mi_a = 0.5;    /// Aggregate to aggregate friction coefficient
+    sys.GetSettings()->dfc_contact_param.E_Nm_s = 0.05e6;   /// Mortar to surface stiffness
+    sys.GetSettings()->dfc_contact_param.E_Na_s = 100e6;    /// Mortar to aggregate stiffness
+    sys.GetSettings()->dfc_contact_param.alfa_a_s = 0.25;   /// Normal-shear coupling parameter for concrete interaction with surface
+    sys.GetSettings()->dfc_contact_param.sigma_t_s = 0.0024e6;  /// Tensile strength of mortar interacting with surface
+    sys.GetSettings()->dfc_contact_param.sigma_tau0_s = 50; /// Mortar shear yield stress interacting with surface
+    sys.GetSettings()->dfc_contact_param.eta_inf_s = 50;    /// Mortar plastic viscosity interacting with surface
+    sys.GetSettings()->dfc_contact_param.mi_a_s = 0.5;  /// Aggregate to surface friction coefficient
+    sys.GetSettings()->dfc_contact_param.t = 2.5e-3;    /// thickness of mortar layer on surfaces
+
     // The following two lines are optional, since they are the default options. They are added for future reference,
     // i.e. when needed to change those models.
     sys.GetSettings()->solver.contact_force_model = chrono::ChSystemSMC::ContactForceModel::DFC;
   
     int ball_quantity = 4;
-    auto created_balls = AddBalls(sys,ball_quantity , 0.01);
+    auto created_balls = AddBalls(sys,ball_quantity , 0.1);
     
 	std::shared_ptr<ChVisualSystem> vis;
 	auto vis_irr = chrono_types::make_shared<ChVisualSystemIrrlicht>();
@@ -218,7 +242,7 @@ int main(int argc, char* argv[]) {
     strain_data.open("all_strain_data.txt");
 
     double simulation_time = 0;
-    while (simulation_time <= 4) {
+    while (simulation_time <= 1) {
         vis->BeginScene();
         vis->Render();
         vis->RenderGrid(ChFrame<>(VNULL, Q_from_AngX(CH_C_PI_2)), 12, 0.5);

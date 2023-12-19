@@ -558,6 +558,7 @@ void function_CalcContactForces(
 void function_CalcDFCForces(int index,               // index of this contact pair
                             vec2* body_pairs,        // indices of the body pair in contact
                             vec2* shape_pairs,       // indices of the shape pair in contact
+                            real dT,                 // integration time step
                             real3* pos,              // body positions
                             quaternion* rot,         // body orientations
                             real* vel,               // body linear and angular velocities
@@ -590,80 +591,271 @@ void function_CalcDFCForces(int index,               // index of this contact pa
         return;
     }
 
+    // get proper model parameters
+    /// Mortar to mortar and mortar to aggregate stiffness
+    real E_Nm;
+    /// Aggregate to aggregate stiffness
+    real E_Na;
+    /// Thickness of mortar layer around an aggregate
+    real h;
+    /// Normal-shear coupling parameter inside concrete
+    real alfa_a;
+    /// Parameter governing viscous behaviour in normal direction
+    real beta;
+    /// Tensile strength of mortar
+    real sigma_t;
+    /// Mortar shear yield stress
+    real sigma_tau0;
+    /// Mortar plastic viscosity
+    real eta_inf;
+    /// Peanalty constant
+    real kappa_0;
+    /// Constant defining flow (n = 1 -> Newtonian, n > 1 -> shear-thickening,
+    /// n < 1 shear-thinning)
+    real n;
+    /// Aggregate to aggregate friction coefficient
+    real mi_a;
+    /// thickness of mortar layer on surfaces
+    real t;
+    if (radiuses[index].x != -1 && radiuses[index].y != -1) {   // both contacting shapes are spheres
+        E_Nm = param.E_Nm;
+        E_Na = param.E_Na;
+        h = param.h;
+        alfa_a = param.alfa_a;
+        beta = param.beta;
+        sigma_t = param.sigma_t;
+        sigma_tau0 = param.sigma_tau0;
+        eta_inf = param.eta_inf;
+        kappa_0 = param.kappa_0;
+        n = param.n;
+        mi_a = param.mi_a;
+        t = 0;
+    } else {  // any of the contacting shapes is not a sphere
+        E_Nm = param.E_Na_s;
+        E_Na = param.E_Na_s;
+        h = param.h;
+        alfa_a = param.alfa_a_s;
+        beta = param.beta;
+        sigma_t = param.sigma_t_s;
+        sigma_tau0 = param.sigma_tau0_s;
+        eta_inf = param.eta_inf_s;
+        kappa_0 = param.kappa_0;
+        n = param.n;
+        mi_a = param.mi_a_s;
+        t = param.t;
+    }
     // Identify the two shapes in contact (global shape IDs).
     int s1 = shape_pairs[index].x;
     int s2 = shape_pairs[index].y;
 
+    // Define body I and J
+    int body_I = std::max(b1, b2);
+    int body_J = std::min(b1, b2);
+    int shape_body_I = std::max(s1, s2);
+    int shape_body_J = std::min(s1, s2);
+    real R_I, R_J;
+    real3 pt_I, pt_J;
+    if (body_I == b1) {
+        R_I = radiuses[index].x;
+        R_J = radiuses[index].y;
+        pt_I = pt1[index];
+        pt_J = pt2[index];
+    } else {
+        R_I = radiuses[index].y;
+        R_J = radiuses[index].x;
+        pt_I = pt2[index];
+        pt_J = pt1[index];
+    }
+
     // Kinematic information
     // ---------------------
+    // Calculate distance between bodies
+    real l_IJ;
+    if (R_I != -1 && R_J != -1) {
+        l_IJ = Length(pos[body_J] - pos[body_I]);
+    } else if (R_I == -1) {
+        l_IJ = R_J + depth[index] + t;  // distance of the particle center to surface (depth is minus if penetration occurs)
+    } else {
+        l_IJ = R_I + depth[index] + t;
+    }
 
-    // Express contact point locations in local frames
-    //   s' = At * s = At * (rP - r)
-    real3 pt1_loc = TransformParentToLocal(pos[b1], rot[b1], pt1[index]);
-    real3 pt2_loc = TransformParentToLocal(pos[b2], rot[b2], pt2[index]);
+    // Calculate versor o normal direction
+    auto e_IJ_N_vec = (pos[body_J] - pos[body_I]) / l_IJ;
+    // Calculate distance from center o body I to contact surface
+    real a_I;
+    if (R_I != -1 && R_J != -1) {
+        a_I = (Pow(R_I, 2) - Pow(R_J, 2) + Pow(l_IJ, 2)) / (2*l_IJ);
+    } else {
+        a_I = l_IJ - t;
+    }
+    // Calculate squared radius of contact surface 
+    real H_IJ = Pow(R_I, 2) - Pow(a_I, 2);
+    // Calculate area of contact surface H_IJ is already squared
+    real A_IJ = H_IJ * CH_C_PI;
+    // Create vectors to express location of the contact area
+    real3 a_I_vec;
+    real3 a_J_vec;
+    if (R_I != -1 && R_J != -1) {
+        a_I_vec = a_I * e_IJ_N_vec;
+        a_J_vec = -(l_IJ - a_I) * e_IJ_N_vec;
+    } else if (R_I == -1) {
+        a_I_vec = TransformParentToLocal(pos[body_I], rot[body_I], pt_I);
+        a_J_vec = -(l_IJ - a_I) * e_IJ_N_vec;
+    } else {
+        a_I_vec = a_I * e_IJ_N_vec;
+        a_J_vec = TransformParentToLocal(pos[body_J], rot[body_J], pt_J);
+    }
 
     // Calculate velocities of the contact points (in global frame)
     //   vP = v + omg x s = v + A * (omg' x s')
-    real3 v_body1 = real3(vel[b1 * 6 + 0], vel[b1 * 6 + 1], vel[b1 * 6 + 2]);
-    real3 v_body2 = real3(vel[b2 * 6 + 0], vel[b2 * 6 + 1], vel[b2 * 6 + 2]);
+    real3 v_body_I = real3(vel[body_I * 6 + 0], vel[body_I * 6 + 1], vel[body_I * 6 + 2]);
+    real3 v_body_J = real3(vel[body_J * 6 + 0], vel[body_J * 6 + 1], vel[body_J * 6 + 2]);
 
-    real3 o_body1 = real3(vel[b1 * 6 + 3], vel[b1 * 6 + 4], vel[b1 * 6 + 5]);
-    real3 o_body2 = real3(vel[b2 * 6 + 3], vel[b2 * 6 + 4], vel[b2 * 6 + 5]);
+    real3 o_body_I = real3(vel[body_I * 6 + 3], vel[body_I * 6 + 4], vel[body_I * 6 + 5]);
+    real3 o_body_J = real3(vel[body_J * 6 + 3], vel[body_J * 6 + 4], vel[body_J * 6 + 5]);
+    // Calculate relative velocity vectors
+    real3 vel_I = v_body_I + Rotate(Cross(o_body_I, a_I_vec), rot[body_I]);
+    real3 vel_J = v_body_J + Rotate(Cross(o_body_J, a_J_vec), rot[body_J]);
+    real3 u_IJ_dt_vec =  vel_J - vel_I;
+    real3 u_IJ_ML_dt_vec = u_IJ_dt_vec - Dot(u_IJ_dt_vec, e_IJ_N_vec) * e_IJ_N_vec;
+    real3 e_IJ_ML_vec;
+    if (Length(u_IJ_ML_dt_vec) != 0){
+        e_IJ_ML_vec = u_IJ_ML_dt_vec/Length(u_IJ_ML_dt_vec);
+    }
+    else {
+        e_IJ_ML_vec = real3(0, 0, 0);
+    }
+    // Calculata strain rates
+    real epsilon_IJ_N_dt = Dot(u_IJ_dt_vec, e_IJ_N_vec) / l_IJ;
+    real epsilon_IJ_ML_dt = Length(u_IJ_ML_dt_vec) / l_IJ;
 
-    real3 vel1 = v_body1 + Rotate(Cross(o_body1, pt1_loc), rot[b1]);
-    real3 vel2 = v_body2 + Rotate(Cross(o_body2, pt2_loc), rot[b2]);
+    // Calculate gamma0 prim
+    real gamma_0_dt = sigma_tau0 / (kappa_0 * eta_inf);
 
-    // Calculate relative velocity (in global frame)
-    // Note that relvel_n_mag is a signed quantity, while relvel_t_mag is an
-    // actual magnitude (always positive).
-    real3 relvel = vel2 - vel1;
-    real relvel_n_mag = Dot(relvel, normal[index]);
-    real3 relvel_n = relvel_n_mag * normal[index];
-    real3 relvel_t = relvel - relvel_n;
-    real relvel_t_mag = Length(relvel_t);
+    // Calculate gamma prim
+    real gamma_dt = Sqrt(beta * Pow(epsilon_IJ_N_dt, 2) + Pow(epsilon_IJ_ML_dt, 2));
 
-    // Extract composite material properties
-    // -------------------------------------
+    // Calculate eta_gamma prim
+    real eta_gamma_dt;
+    if (gamma_dt <= gamma_0_dt) {
+        eta_gamma_dt = kappa_0 * eta_inf;
+    }
+    else {
+        eta_gamma_dt = eta_inf * Pow(Abs(gamma_dt), n-1);
+    }
 
+    // Calculate viscous stresses
+    real sigma_N_tau = beta * eta_gamma_dt * epsilon_IJ_N_dt;
+    real sigma_ML_tau = eta_gamma_dt * epsilon_IJ_ML_dt;
 
+    // Calculate epsilon_N
+    real epsilon_N;
+    if (R_I != -1 && R_J != -1) {
+        epsilon_N = log(l_IJ / (R_I + R_J - h));
+    } else if (R_I == -1) {
+        epsilon_N = log(l_IJ/ (R_J + t - h/2));
+    } else {
+        epsilon_N = log(l_IJ/ (R_I + t - h/2));
+    }
 
-    // Contact force
-    // -------------
-
-    // All models use the following formulas for normal and tangential forces:
-    //     Fn = kn * delta_n - gn * v_n
-    //     Ft = kt * delta_t - gt * v_t
-    // The stiffness and damping coefficients are obtained differently, based
-    // on the force model and on how coefficients are specified.
-    real kn = 0;
-    real kt = 0;
-    real gn = 0;
-    real gt = 0;
-    real kn_simple = 0;
-    real gn_simple = 0;
-
-    real t_contact = 0;
-    real relvel_init = abs(relvel_n_mag);
-    real delta_n = -depth[index];
-    real3 delta_t = real3(0);
-
+    // Check if contact history already exists. If not, initialize new contact history.
     int i;
     int contact_id = -1;
-    int shear_body1 = -1;
-    int shear_body2;
-    int shear_shape1;
-    int shear_shape2;
     bool newcontact = true;
-    GetLog() << "The following is a debug information for DFC contact force model \n";
-    GetLog() << "This is a contact of body 1 and body 2 with following indexes: " << b1 << " " << b2 << "\n";
-    GetLog() << "In this contact following shape 1 and shape 2 are involved: " << s1 << " " << s2 << "\n";
-    GetLog() << "Radiuses of the contacting shape 1 and shape 2 are: " << radiuses[index].x << " " << radiuses[index].y << "\n";
-    ct_bid[2 * index] = b1;
-    ct_bid[2 * index + 1] = b2;
-    ct_force[2 * index] = real3(0);
-    ct_force[2 * index + 1] = real3(0);
-    ct_torque[2 * index] = real3(0);
-    ct_torque[2 * index + 1] = real3(0);
+    for (i = 0; i < max_shear; i++) {
+        int ctIdUnrolled = max_shear * body_I + i;
+        if (cont_neigh[ctIdUnrolled].x == body_J && cont_neigh[ctIdUnrolled].y == shape_body_I &&
+            cont_neigh[ctIdUnrolled].z == shape_body_J) {
+            contact_id = i;
+            newcontact = false;
+            break;
+        }
+    }
+    if (newcontact == true) {
+        for (i = 0; i < max_shear; i++) {
+            int ctIdUnrolled = max_shear * body_I + i;
+            if (cont_neigh[ctIdUnrolled].x == -1) {
+                contact_id = i;
+                cont_neigh[ctIdUnrolled].x = body_J;
+                cont_neigh[ctIdUnrolled].y = shape_body_I;
+                cont_neigh[ctIdUnrolled].z = shape_body_J;
+                DFC_stress[ctIdUnrolled].x = 0;
+                DFC_stress[ctIdUnrolled].y = 0;
+                DFC_stress[ctIdUnrolled].z = 0;
+                break;
+                }
+            }
+        }
+    
+    // calculate stiffness stresses
+    int ctSaveId = max_shear * body_I + contact_id;
+    real input_sigma_N_s = DFC_stress[ctSaveId].x;
+    real input_sigma_ML_s = DFC_stress[ctSaveId].y;
+    real sigma_N_s;
+    real sigma_ML_s;
+    real delta_sigma_N_s;
+    real delta_sigma_ML_s;
+    if (epsilon_N >= 0) {
+        if (input_sigma_N_s <= sigma_t) {
+            sigma_N_s = input_sigma_N_s;
+            sigma_ML_s = 0;
+        }
+        else {
+            sigma_N_s = sigma_t;
+            sigma_ML_s = 0;
+        }
+        delta_sigma_N_s = E_Nm * epsilon_IJ_N_dt *dT;
+        delta_sigma_ML_s = 0;
+    }
+    else {
+        real epsilon_a;
+        if (R_I != -1 && R_J != -1) {
+            epsilon_a = -log(1 + h / (R_I + R_J - 2*h));
+        } else if (R_I == -1) {
+            epsilon_a = -log(1 + h / (R_J - h + t));
+        } else {
+            epsilon_a = -log(1 + h / (R_I - h + t));
+        }
+        if (epsilon_N >= epsilon_a){
+            sigma_N_s = input_sigma_N_s;
+            sigma_ML_s = 0;
+            delta_sigma_N_s = E_Nm * epsilon_IJ_N_dt * dT;
+            delta_sigma_ML_s = 0;
+        } else {
+            sigma_N_s = input_sigma_N_s;
+            if (input_sigma_ML_s <= mi_a * sigma_N_s) {
+                sigma_ML_s = input_sigma_ML_s;
+            }
+            else {
+                sigma_ML_s = mi_a * sigma_N_s;
+            }
+            delta_sigma_N_s = E_Na * epsilon_IJ_N_dt * dT;
+            delta_sigma_ML_s = alfa_a * E_Na * epsilon_IJ_ML_dt *dT;
+            // Record that these two bodies are in aggregate to aggregate contact
+            cont_touch[ctSaveId] = true;
+        }
+    }
+    
+    // Calculate contact force
+    real3 contact_force = (sigma_N_s + sigma_N_tau) * A_IJ * e_IJ_N_vec + (sigma_ML_s + sigma_ML_tau) * A_IJ * e_IJ_ML_vec;
+
+    // Convert force into the local body frames and calculate induced torques
+    //    n' = s' x F' = s' x (A*F)
+    real3 contact_torque_I = Cross(a_I_vec, RotateT((sigma_ML_s + sigma_ML_tau) * A_IJ * e_IJ_ML_vec, rot[body_I]));
+    real3 contact_torque_J = Cross(a_J_vec, RotateT((sigma_ML_s + sigma_ML_tau) * A_IJ * e_IJ_ML_vec, rot[body_J]));
+
+    // Increment stored stiffness stresses and return contact force and torque
+    DFC_stress[ctSaveId].x += delta_sigma_N_s;
+    DFC_stress[ctSaveId].y += delta_sigma_ML_s;
+    
+    // Store body forces and torques, duplicated for the two bodies.
+    ct_bid[2 * index] = body_I;
+    ct_bid[2 * index + 1] = body_J;
+    ct_force[2 * index] = contact_force;
+    ct_force[2 * index + 1] = -contact_force;
+    ct_torque[2 * index] = contact_torque_I;
+    ct_torque[2 * index + 1] = -contact_torque_J;
+
     return;
 }
 
@@ -684,6 +876,7 @@ void ChIterativeSolverMulticoreSMC::host_CalcContactForces(custom_vector<int>& c
                 index,                                             // index of this contact pair
                 data_manager->cd_data->bids_rigid_rigid.data(),    // indices of the body pair in contact
                 shape_pairs.data(),                                 // indices of the shape pair in contact
+                data_manager->settings.step_size,                  // integration time step
                 data_manager->host_data.pos_rigid.data(),          // body positions
                 data_manager->host_data.rot_rigid.data(),          // body orientations
                 data_manager->host_data.v.data(),                  // body linear and angular velocities
@@ -841,12 +1034,23 @@ void ChIterativeSolverMulticoreSMC::ProcessContacts() {
     thrust::copy(THRUST_PAR ct_force.begin(), ct_force.end(), data_manager->host_data.ct_force.begin());
     thrust::copy(THRUST_PAR ct_torque.begin(), ct_torque.end(), data_manager->host_data.ct_torque.begin());
 
-    if (data_manager->settings.solver.tangential_displ_mode == ChSystemSMC::TangentialDisplacementModel::MultiStep) {
+    if (data_manager->settings.solver.tangential_displ_mode == ChSystemSMC::TangentialDisplacementModel::MultiStep &&
+        data_manager->settings.solver.contact_force_model != ChSystemSMC::ContactForceModel::DFC) {
 #pragma omp parallel for
         for (int index = 0; index < (signed)data_manager->num_rigid_bodies; index++) {
             for (int i = 0; i < max_shear; i++) {
                 if (shear_touch[max_shear * index + i] == false)
                     data_manager->host_data.shear_neigh[max_shear * index + i].x = -1;
+            }
+        }
+    }
+
+    if (data_manager->settings.solver.contact_force_model == ChSystemSMC::ContactForceModel::DFC) {
+#pragma omp parallel for
+        for (int index = 0; index < (signed)data_manager->num_rigid_bodies; index++) {
+            for (int i = 0; i < max_shear; i++) {
+                if (shear_touch[max_shear * index + i] == false)
+                    data_manager->host_data.shear_disp[max_shear * index + i].y = 0;
             }
         }
     }
