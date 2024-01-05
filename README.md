@@ -79,7 +79,7 @@ Copy the SIF file into your User Directory
 
 * In the SSH window run the following command, being sure to replace **LastnameFirstname** with your correct directory name
 
-<pre><code><strong>cp /projects/p31861/SingularityContainer/project-chrono-dependencies.sif /projects/p31861/Users/LastnameFirstname 
+<pre><code><strong>cp /projects/p31861/SingularityContainer/project-chrono-dependencies-with-intel-mkl.sif /projects/p31861/Users/LastnameFirstname 
 </strong></code></pre>
 
 </details>
