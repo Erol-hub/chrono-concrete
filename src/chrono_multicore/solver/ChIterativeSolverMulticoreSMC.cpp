@@ -679,7 +679,7 @@ void function_CalcDFCForces(int index,               // index of this contact pa
         l_IJ = R_I + depth[index] + t;
     }
 
-    // Calculate versor o normal direction
+    // Calculate versor of normal direction, pointing from I to J
     auto e_IJ_N_vec = (pos[body_J] - pos[body_I]) / l_IJ;
     // Calculate distance from center o body I to contact surface
     real a_I;
@@ -688,6 +688,7 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     } else {
         a_I = l_IJ - t;
     }
+
     // Calculate squared radius of contact surface 
     real H_IJ = Pow(R_I, 2) - Pow(a_I, 2);
     // Calculate area of contact surface H_IJ is already squared
@@ -714,20 +715,65 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     real3 o_body_I = real3(vel[body_I * 6 + 3], vel[body_I * 6 + 4], vel[body_I * 6 + 5]);
     real3 o_body_J = real3(vel[body_J * 6 + 3], vel[body_J * 6 + 4], vel[body_J * 6 + 5]);
     // Calculate relative velocity vectors
-    real3 vel_I = v_body_I + Rotate(Cross(o_body_I, a_I_vec), rot[body_I]);
-    real3 vel_J = v_body_J + Rotate(Cross(o_body_J, a_J_vec), rot[body_J]);
+    real3 vel_I;
+    real3 vel_J;
+    if (R_I != -1 && R_J != -1) {
+        vel_I = v_body_I + Cross(o_body_I, a_I_vec);  // both vectors are given in global frame
+        vel_J = v_body_J + Cross(o_body_J, a_J_vec);
+    } else if (R_I == -1) {
+        vel_I = v_body_I + Rotate(Cross(o_body_I, a_I_vec), rot[body_I]);  // a_I given in local frame (not a sphere)
+        vel_J = v_body_J + Cross(o_body_J, a_J_vec);
+    } else {
+        vel_I = v_body_I + Cross(o_body_I, a_I_vec);
+        vel_J = v_body_J + Rotate(Cross(o_body_J, a_J_vec), rot[body_J]);
+    }
+    
     real3 u_IJ_dt_vec =  vel_J - vel_I;
     real3 u_IJ_ML_dt_vec = u_IJ_dt_vec - Dot(u_IJ_dt_vec, e_IJ_N_vec) * e_IJ_N_vec;
     real3 e_IJ_ML_vec;
-    if (Length(u_IJ_ML_dt_vec) != 0){
-        e_IJ_ML_vec = u_IJ_ML_dt_vec/Length(u_IJ_ML_dt_vec);
+
+    // Calculate versor of tangent direction
+    real alfa = acos(Dot(e_IJ_N_vec, real3(1, 0, 0)));  // angle between normal unit vector and global X-axis
+    if (alfa != 0) {
+        real3 rotation_axis = Cross(e_IJ_N_vec, real3(1, 0, 0));
+        if (Length(rotation_axis) != 0){    // normalize rotation axis
+            rotation_axis = rotation_axis/Length(rotation_axis);
+        } else {
+            rotation_axis = real3(0, 0, 0);
+        }
+        chrono::ChQuaternion<real> transformation_quaternion;
+        transformation_quaternion.Q_from_AngAxis(alfa,
+                                                 chrono::ChVector(rotation_axis.x, rotation_axis.y, rotation_axis.z));
+        auto global_normal_direction = transformation_quaternion.Rotate(chrono::ChVector(1, 0, 0));
+        if (global_normal_direction.x() != e_IJ_N_vec.x || global_normal_direction.y() != e_IJ_N_vec.y ||
+            global_normal_direction.z() != e_IJ_N_vec.z) {
+            // the difference between calculated global normal direction and vector e_IJ_N_vec results from wrong sign
+            transformation_quaternion.Q_from_AngAxis(-alfa, chrono::ChVector(rotation_axis.x, rotation_axis.y, rotation_axis.z));
+            global_normal_direction = transformation_quaternion.Rotate(chrono::ChVector(1, 0, 0));
+        }
+        auto global_tangent_direction1 = transformation_quaternion.Rotate(chrono::ChVector(0, 1, 0));
+        auto global_tangent_direction2 = transformation_quaternion.Rotate(chrono::ChVector(0, 0, 1));
+        if (Dot(u_IJ_ML_dt_vec, real3(global_tangent_direction1.x(), global_tangent_direction1.y(), global_tangent_direction1.z())) == 0) {
+            e_IJ_ML_vec = real3(global_tangent_direction2.x(), global_tangent_direction2.y(), global_tangent_direction2.z());
+        }
+        else if(Dot(u_IJ_ML_dt_vec, real3(global_tangent_direction2.x(), global_tangent_direction2.y(), global_tangent_direction2.z())) == 0){ 
+            e_IJ_ML_vec = real3(global_tangent_direction1.x(), global_tangent_direction1.y(), global_tangent_direction1.z());
+        } else {
+            std::cout << "Definition of tangent direction failed. Check the problem.";
+        }
+    } else {
+        if (Dot(u_IJ_ML_dt_vec, real3(0, 1, 0)) == 0) {
+            e_IJ_ML_vec = real3(0, 0, 1);
+        } else if (Dot(u_IJ_ML_dt_vec, real3(0, 0, 1)) == 0) {
+            e_IJ_ML_vec = real3(0, 1, 0);
+        } else {
+            std::cout << "Definition of tangent direction failed. Check the problem.";
+        }
     }
-    else {
-        e_IJ_ML_vec = real3(0, 0, 0);
-    }
+    
     // Calculata strain rates
     real epsilon_IJ_N_dt = Dot(u_IJ_dt_vec, e_IJ_N_vec) / l_IJ;
-    real epsilon_IJ_ML_dt = Length(u_IJ_ML_dt_vec) / l_IJ;
+    real epsilon_IJ_ML_dt = Dot(u_IJ_ML_dt_vec, e_IJ_ML_vec) / l_IJ;  // previous code: Length(u_IJ_ML_dt_vec)
 
     // Calculate gamma0 prim
     real gamma_0_dt = sigma_tau0 / (kappa_0 * eta_inf);
@@ -816,18 +862,18 @@ void function_CalcDFCForces(int index,               // index of this contact pa
         } else {
             epsilon_a = -log(1 + h / (R_I - h + t));
         }
-        if (epsilon_N >= epsilon_a){
+        if (epsilon_N > epsilon_a){
             sigma_N_s = input_sigma_N_s;
             sigma_ML_s = 0;
             delta_sigma_N_s = E_Nm * epsilon_IJ_N_dt * dT;
             delta_sigma_ML_s = 0;
         } else {
             sigma_N_s = input_sigma_N_s;
-            if (input_sigma_ML_s <= mi_a * sigma_N_s) {
+            if (abs(input_sigma_ML_s) <= abs(mi_a * sigma_N_s)) {
                 sigma_ML_s = input_sigma_ML_s;
             }
             else {
-                sigma_ML_s = mi_a * sigma_N_s;
+                sigma_ML_s = mi_a * abs(sigma_N_s) * Sign(input_sigma_ML_s);
             }
             delta_sigma_N_s = E_Na * epsilon_IJ_N_dt * dT;
             delta_sigma_ML_s = alfa_a * E_Na * epsilon_IJ_ML_dt *dT;
@@ -854,8 +900,20 @@ void function_CalcDFCForces(int index,               // index of this contact pa
     ct_force[2 * index] = contact_force;
     ct_force[2 * index + 1] = -contact_force;
     ct_torque[2 * index] = contact_torque_I;
-    ct_torque[2 * index + 1] = -contact_torque_J;
+    ct_torque[2 * index + 1] = contact_torque_J;  // cross vector product should give proper sign
 
+    /*
+    * only for validation purposes
+    std::ofstream DFC_strain_stress;
+    DFC_strain_stress.open("DFC_strain_stress.txt", std::ios_base::app);
+    DFC_strain_stress << epsilon_N << ", " << sigma_N_s << ", " << sigma_N_tau << ", " << epsilon_IJ_ML_dt << ", "
+                      << sigma_ML_s << ", " << sigma_ML_tau << ", " << DFC_stress[ctSaveId].z << ", "
+                      << epsilon_IJ_N_dt << " ," << contact_torque_I.x << " ," << contact_torque_I.y << " ,"
+                      << contact_torque_I.z
+                      << "\n";
+    DFC_strain_stress.close();
+    DFC_stress[ctSaveId].z += epsilon_IJ_N_dt * dT;
+    */
     return;
 }
 
