@@ -24,16 +24,16 @@
 #include <irrlicht.h>
 
 #include "chrono/assets/ChVisualSystem.h"
-#include "chrono/assets/ChBoxShape.h"
-#include "chrono/assets/ChCylinderShape.h"
-#include "chrono/assets/ChSphereShape.h"
-#include "chrono/assets/ChCapsuleShape.h"
-#include "chrono/assets/ChModelFileShape.h"
+#include "chrono/assets/ChVisualShapeBox.h"
+#include "chrono/assets/ChVisualShapeCylinder.h"
+#include "chrono/assets/ChVisualShapeSphere.h"
+#include "chrono/assets/ChVisualShapeCapsule.h"
+#include "chrono/assets/ChVisualShapeModelFile.h"
 #include "chrono/assets/ChVisualShape.h"
-#include "chrono/assets/ChTriangleMeshShape.h"
+#include "chrono/assets/ChVisualShapeTriangleMesh.h"
 #include "chrono/assets/ChGlyphs.h"
-#include "chrono/assets/ChPathShape.h"
-#include "chrono/assets/ChLineShape.h"
+#include "chrono/assets/ChVisualShapePath.h"
+#include "chrono/assets/ChVisualShapeLine.h"
 
 #include "chrono_irrlicht/ChApiIrr.h"
 #include "chrono_irrlicht/ChIrrNodeModel.h"
@@ -85,6 +85,10 @@ class ChApiIrr ChVisualSystemIrrlicht : virtual public ChVisualSystem {
     /// Must be called before Initialize().
     void SetWindowTitle(const std::string& win_title);
 
+    /// Set the window ID.
+    /// Must be called before Initialize().
+    void SetWindowId(void* window_id);
+
     /// Use Y-up camera rendering (default CameraVerticalDir::Y).
     /// Must be called before Initialize().
     void SetCameraVertical(CameraVerticalDir vert);
@@ -101,7 +105,7 @@ class ChApiIrr ChVisualSystemIrrlicht : virtual public ChVisualSystem {
 
     /// Initialize the visualization system.
     /// This creates the Irrlicht device using the current values for the optional device parameters.
-    virtual void Initialize();
+    virtual void Initialize() override;
 
     /// Add a logo in a 3D scene.
     /// Has no effect, unles called after Initialize().
@@ -113,6 +117,17 @@ class ChApiIrr ChVisualSystemIrrlicht : virtual public ChVisualSystem {
     /// changed with keyboard 'PgUp' and 'PgDn' keys. Optional parameters are position and target.
     /// Has no effect, unles called after Initialize().
     virtual int AddCamera(const ChVector<>& pos, ChVector<> targ = VNULL) override;
+
+    /// Add a grid with specified parameters in the x-y plane of the given frame.
+    virtual void AddGrid(double x_step,                           ///< grid cell size in X direction
+                         double y_step,                           ///< grid cell size in Y direction
+                         int nx,                                  ///< number of cells in X direction
+                         int ny,                                  ///< number of cells in Y direction
+                         ChCoordsys<> pos = CSYSNORM,             ///< grid reference frame
+                         ChColor col = ChColor(0.1f, 0.1f, 0.1f)  ///< grid line color
+                         ) override;
+
+    void UpdateGrid(int id, const ChCoordsys<>& csys);
 
     /// Set the location of the specified camera.
     virtual void SetCameraPosition(int id, const ChVector<>& pos) override;
@@ -200,6 +215,10 @@ class ChApiIrr ChVisualSystemIrrlicht : virtual public ChVisualSystem {
     /// Has no effect, unless called after the visual system is initialized and attached.
     void EnableCollisionShapeDrawing(bool val);
 
+    /// Enable rendering of the absolute coordinate system (default: none).
+    /// Has no effect, unless called after the visual system is initialized and attached.
+    void EnableAbsCoordsysDrawing(bool val);
+
     /// Enable modal analysis visualization (default: false).
     /// If true, visualize an oscillatory motion of the n-th mode (only if some ChModalAssembly is found).
     /// Otherwise, visualize the dynamic evolution of the associated system.
@@ -235,6 +254,9 @@ class ChApiIrr ChVisualSystemIrrlicht : virtual public ChVisualSystem {
     irr::scene::ISceneManager* GetSceneManager() { return m_device->getSceneManager(); }
     irr::scene::ICameraSceneNode* GetActiveCamera() { return m_device->getSceneManager()->getActiveCamera(); }
     irr::gui::IGUIEnvironment* GetGUIEnvironment() { return m_device->getGUIEnvironment(); }
+
+    /// Get the window ID.
+    void* GetWindowId() const { return m_device_params.WindowId; };
 
     /// Process all visual assets in the associated ChSystem.
     /// This function is called by default by Initialize(), but can also be called later if further modifications to
@@ -278,9 +300,6 @@ class ChApiIrr ChVisualSystemIrrlicht : virtual public ChVisualSystem {
     /// </pre>
     virtual void Render() override;
 
-    /// Render a horizontal grid at the specified location.
-    virtual void RenderGrid(const ChFrame<>& frame, int num_divs, double delta) override;
-
     /// Render the specified reference frame.
     virtual void RenderFrame(const ChFrame<>& frame, double axis_length = 1) override;
 
@@ -303,8 +322,14 @@ class ChApiIrr ChVisualSystemIrrlicht : virtual public ChVisualSystem {
     /// Set internal utility flag value.
     void SetUtilityFlag(bool flag) { m_utility_flag = flag; }
 
+    /// Get device creation parameters.
+    irr::SIrrlichtCreationParameters GetCreationParameters() const { return m_device_params; }
+
+    /// Set device creation parameters.
+    void SetCreationParameters(const irr::SIrrlichtCreationParameters& device_params) { m_device_params = device_params; }
+
   private:
-    /// /// Irrlicht scene node for a visual model not associated with a physics item.
+    /// Irrlicht scene node for a visual model not associated with a physics item.
     class ChIrrNodeVisual : public irr::scene::ISceneNode {
       public:
         ChIrrNodeVisual(irr::scene::ISceneNode* parent, irr::scene::ISceneManager* mgr)
@@ -340,7 +365,17 @@ class ChApiIrr ChVisualSystemIrrlicht : virtual public ChVisualSystem {
     /// Remove all visualization objects from this visualization system.
     virtual void OnClear(ChSystem* sys) override;
 
+    struct GridData {
+        double x_step;
+        double y_step;
+        int nx;
+        int ny;
+        ChCoordsys<> csys;
+        ChColor col;
+    };
+
     std::vector<std::shared_ptr<RTSCamera>> m_cameras;  ///< list of cameras defined for the scene
+    std::vector<GridData> m_grids;                      ///< list of visualization grids
 
     std::unordered_map<ChPhysicsItem*, std::shared_ptr<ChIrrNodeModel>> m_nodes;  ///< scene nodes for physics items
     std::vector<std::shared_ptr<ChIrrNodeVisual>> m_vis_nodes;                    ///< scene nodes for vis-only models

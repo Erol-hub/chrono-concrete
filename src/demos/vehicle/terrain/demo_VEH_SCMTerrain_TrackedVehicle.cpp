@@ -66,7 +66,7 @@ ChQuaternion<> initRot(1, 0, 0, 0);
 // Terrain dimensions
 double terrain_length = 20.0;  // size in X direction
 double terrain_width = 4.0;    // size in Y direction
-double delta = 0.05;          // SCM grid spacing
+double delta = 0.05;           // SCM grid spacing
 
 // Simulation step size
 double step_size = 5e-4;
@@ -107,12 +107,13 @@ int main(int argc, char* argv[]) {
     // --------------------------
 
     M113 m113;
+    m113.SetCollisionSystemType(ChCollisionSystem::Type::BULLET);
     m113.SetContactMethod(ChContactMethod::SMC);
     m113.SetTrackShoeType(TrackShoeType::SINGLE_PIN);
     m113.SetBrakeType(BrakeType::SIMPLE);
     m113.SetDrivelineType(DrivelineTypeTV::BDS);
     m113.SetEngineType(EngineModelType::SHAFTS);
-    m113.SetTransmissionType(TransmissionModelType::SHAFTS);
+    m113.SetTransmissionType(TransmissionModelType::AUTOMATIC_SHAFTS);
     m113.SetChassisCollisionType(CollisionType::NONE);
 
     // Control steering type (enable crossdrive capability)
@@ -137,7 +138,8 @@ int main(int argc, char* argv[]) {
     ////m113.GetVehicle().SetCollide(TrackedCollisionFlag::NONE);
 
     // Monitor internal contacts for the left sprocket, left idler, and first shoe on the left track.
-    ////m113.GetVehicle().MonitorContacts(TrackedCollisionFlag::SPROCKET_LEFT | TrackedCollisionFlag::SHOES_LEFT | TrackedCollisionFlag::IDLER_LEFT);
+    ////m113.GetVehicle().MonitorContacts(TrackedCollisionFlag::SPROCKET_LEFT | TrackedCollisionFlag::SHOES_LEFT |
+    ///TrackedCollisionFlag::IDLER_LEFT);
 
     // Collect contact information
     ////m113.GetVehicle().SetContactCollection(true);
@@ -291,10 +293,8 @@ int main(int argc, char* argv[]) {
         auto integrator = std::static_pointer_cast<ChTimestepperHHT>(system->GetTimestepper());
         integrator->SetAlpha(-0.2);
         integrator->SetMaxiters(50);
-        integrator->SetAbsTolerances(5e-05, 1.8e00);
-        integrator->SetMode(ChTimestepperHHT::POSITION);
+        integrator->SetAbsTolerances(1e-1, 10);
         integrator->SetModifiedNewton(false);
-        integrator->SetScaling(true);
         integrator->SetVerbose(true);
 #endif
     } else {
@@ -311,12 +311,6 @@ int main(int argc, char* argv[]) {
     // ---------------
     // Simulation loop
     // ---------------
-
-    // Inter-module communication data
-    BodyStates shoe_states_left(m113.GetVehicle().GetNumTrackShoes(LEFT));
-    BodyStates shoe_states_right(m113.GetVehicle().GetNumTrackShoes(RIGHT));
-    TerrainForces shoe_forces_left(m113.GetVehicle().GetNumTrackShoes(LEFT));
-    TerrainForces shoe_forces_right(m113.GetVehicle().GetNumTrackShoes(RIGHT));
 
     // Number of simulation steps between two 3D view render frames
     int render_steps = (int)std::ceil(render_step_size / step_size);
@@ -335,23 +329,22 @@ int main(int argc, char* argv[]) {
             vis->EndScene();
 
             if (img_output) {
-                char filename[100];
-                sprintf(filename, "%s/img_%03d.jpg", img_dir.c_str(), render_frame + 1);
-                vis->WriteImageToFile(filename);
+                // Zero-pad frame numbers in file names for postprocessing
+                std::ostringstream filename;
+                filename << img_dir << "/img_" << std::setw(4) << std::setfill('0') << render_frame + 1 << ".jpg";
+                vis->WriteImageToFile(filename.str());
                 render_frame++;
             }
         }
 
-        // Collect output data from modules
+        // Current driver inputs
         DriverInputs driver_inputs = driver->GetInputs();
-        m113.GetVehicle().GetTrackShoeStates(LEFT, shoe_states_left);
-        m113.GetVehicle().GetTrackShoeStates(RIGHT, shoe_states_right);
 
         // Update modules (process inputs from other modules)
         double time = m113.GetVehicle().GetChTime();
         driver->Synchronize(time);
         terrain.Synchronize(time);
-        m113.Synchronize(time, driver_inputs, shoe_forces_left, shoe_forces_right);
+        m113.Synchronize(time, driver_inputs);
         vis->Synchronize(time, driver_inputs);
 
         // Advance simulation for one timestep for all modules
@@ -379,17 +372,17 @@ void AddFixedObstacles(ChSystem* system) {
     double radius = 2;
     double length = 10;
 
-    auto obstacle = std::shared_ptr<ChBody>(system->NewBody());
+    auto obstacle = chrono_types::make_shared<ChBody>();
     obstacle->SetPos(ChVector<>(0, 0, -1.8));
     obstacle->SetBodyFixed(true);
     obstacle->SetCollide(true);
 
     // Visualization
-    auto cyl_shape = chrono_types::make_shared<ChCylinderShape>(radius, length);
+    auto cyl_shape = chrono_types::make_shared<ChVisualShapeCylinder>(radius, length);
     cyl_shape->SetTexture(vehicle::GetDataFile("terrain/textures/tile4.jpg"));
     obstacle->AddVisualShape(cyl_shape, ChFrame<>(VNULL, Q_from_AngX(CH_C_PI_2)));
 
-    auto box_shape = chrono_types::make_shared<ChBoxShape>(terrain_length, 2*length, 0.1);
+    auto box_shape = chrono_types::make_shared<ChVisualShapeBox>(terrain_length, 2 * length, 0.1);
     box_shape->SetColor(ChColor(0.2f, 0.2f, 0.2f));
     obstacle->AddVisualShape(box_shape, ChFrame<>(ChVector<>(0, 0, 1.5), QUNIT));
 
@@ -400,9 +393,8 @@ void AddFixedObstacles(ChSystem* system) {
     minfo.Y = 2e7f;
     auto obst_mat = minfo.CreateMaterial(system->GetContactMethod());
 
-    obstacle->GetCollisionModel()->ClearModel();
-    obstacle->GetCollisionModel()->AddCylinder(obst_mat, radius, length, VNULL, Q_from_AngX(CH_C_PI_2));
-    obstacle->GetCollisionModel()->BuildModel();
+    auto ct_shape = chrono_types::make_shared<ChCollisionShapeCylinder>(obst_mat, radius, length);
+    obstacle->AddCollisionShape(ct_shape, ChFrame<>(VNULL, Q_from_AngX(CH_C_PI_2)));
 
     system->AddBody(obstacle);
 }
@@ -421,7 +413,7 @@ void AddMovingObstacles(ChSystem* system) {
     material->SetFriction(0.4f);
 
     // Create a ball
-    auto ball = std::shared_ptr<ChBody>(system->NewBody());
+    auto ball = chrono_types::make_shared<ChBody>();
 
     ball->SetMass(mass);
     ball->SetPos(pos);
@@ -431,13 +423,12 @@ void AddMovingObstacles(ChSystem* system) {
     ball->SetBodyFixed(false);
     ball->SetCollide(true);
 
-    ball->GetCollisionModel()->ClearModel();
-    ball->GetCollisionModel()->AddSphere(material, radius);
-    ball->GetCollisionModel()->BuildModel();
+    auto ct_shape = chrono_types::make_shared<ChCollisionShapeSphere>(material, radius);
+    ball->AddCollisionShape(ct_shape);
 
     ball->SetInertiaXX(0.4 * mass * radius * radius * ChVector<>(1, 1, 1));
 
-    auto sphere = chrono_types::make_shared<ChSphereShape>(radius);
+    auto sphere = chrono_types::make_shared<ChVisualShapeSphere>(radius);
     sphere->SetTexture(GetChronoDataFile("textures/bluewhite.png"));
     ball->AddVisualShape(sphere);
 

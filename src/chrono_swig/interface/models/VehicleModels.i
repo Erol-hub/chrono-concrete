@@ -12,8 +12,6 @@
 #include "chrono_models/ChApiModels.h"
 
 
-#include "chrono_models/vehicle/generic/Generic_Vehicle.h"
-
 #include "chrono_models/vehicle/hmmwv/HMMWV.h"
 #include "chrono_models/vehicle/hmmwv/HMMWV_Vehicle.h"
 #include "chrono_models/vehicle/hmmwv/HMMWV_VehicleReduced.h"
@@ -38,8 +36,8 @@
 #include "chrono_models/vehicle/gator/Gator.h"
 #include "chrono_models/vehicle/gator/Gator_Vehicle.h"
 
-#include "chrono_models/vehicle/rccar/RCCar.h"
-#include "chrono_models/vehicle/rccar/RCCar_Vehicle.h"
+#include "chrono_models/vehicle/artcar/ARTcar.h"
+#include "chrono_models/vehicle/artcar/ARTcar_Vehicle.h"
 
 #include "chrono_models/vehicle/feda/FEDA.h"
 #include "chrono_models/vehicle/feda/FEDA_Vehicle.h"
@@ -48,8 +46,6 @@
 #include "chrono_models/vehicle/m113/M113_Vehicle.h"
 %}
 
-
-%shared_ptr(chrono::vehicle::generic::Generic_Vehicle)
 
 %shared_ptr(chrono::vehicle::hmmwv::HMMWV)
 %shared_ptr(chrono::vehicle::hmmwv::HMMWV_Vehicle)
@@ -77,8 +73,8 @@
 %shared_ptr(chrono::vehicle::gator::Gator)
 %shared_ptr(chrono::vehicle::gator::Gator_Vehicle)
 
-%shared_ptr(chrono::vehicle::rccar::RCCar)
-%shared_ptr(chrono::vehicle::rccar::RCCar_Vehicle)
+%shared_ptr(chrono::vehicle::artcar::ARTcar)
+%shared_ptr(chrono::vehicle::artcar::ARTcar_Vehicle)
 
 %shared_ptr(chrono::vehicle::feda::FEDA)
 %shared_ptr(chrono::vehicle::feda::FEDA_Vehicle)
@@ -114,8 +110,6 @@
 
 // Model:
 
-%include "../../../chrono_models/vehicle/generic/Generic_Vehicle.h"
-
 %include "../../../chrono_models/vehicle/hmmwv/HMMWV.h"
 %include "../../../chrono_models/vehicle/hmmwv/HMMWV_Vehicle.h"
 %include "../../../chrono_models/vehicle/hmmwv/HMMWV_VehicleReduced.h"
@@ -140,8 +134,8 @@
 %include "../../../chrono_models/vehicle/gator/Gator.h"
 %include "../../../chrono_models/vehicle/gator/Gator_Vehicle.h"
 
-%include "../../../chrono_models/vehicle/rccar/RCCar.h"
-%include "../../../chrono_models/vehicle/rccar/RCCar_Vehicle.h"
+%include "../../../chrono_models/vehicle/artcar/ARTcar.h"
+%include "../../../chrono_models/vehicle/artcar/ARTcar_Vehicle.h"
 
 %include "../../../chrono_models/vehicle/feda/FEDA.h"
 %include "../../../chrono_models/vehicle/feda/FEDA_Vehicle.h"

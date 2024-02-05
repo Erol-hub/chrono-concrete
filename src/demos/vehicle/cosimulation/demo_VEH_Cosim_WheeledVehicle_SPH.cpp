@@ -12,7 +12,7 @@
 // Authors: Radu Serban
 // =============================================================================
 //
-// Demo for Polaris mwheeled vehicle cosimulation on SPH terrain.
+// Demo for Polaris wheeled vehicle cosimulation on CRM terrain.
 // The vehicle (specified through JSON files, for the vehicle, engine,
 // and transmission), is co-simulated with a terrain node and a number of rigid
 // tire nodes equal to the number of wheels.
@@ -230,7 +230,7 @@ int main(int argc, char** argv) {
     if (rank == MBS_NODE_RANK) {
         auto vehicle = static_cast<ChVehicleCosimWheeledVehicleNode*>(node);
         auto path = CreatePath(vehicle::GetDataFile(path_specfile));
-        double x_max = path->getPoint(path->getNumPoints() - 2).x() - 3.0;
+        ////double x_max = path->getPoint(path->getNumPoints() - 2).x() - 3.0;
         auto driver = chrono_types::make_shared<DriverWrapper>(*vehicle->GetVehicle(), path, "path", target_speed, 0.5);
         driver->GetSteeringController().SetLookAheadDistance(2.0);
         driver->GetSteeringController().SetGains(1.0, 0, 0);
@@ -302,7 +302,7 @@ std::shared_ptr<ChBezierCurve> CreatePath(const std::string& path_file) {
         points.push_back(ChVector<>(x, y, z));
     }
 
-    // Include point beyond SPH patch
+    // Include point beyond CRM patch
     {
         auto np = points.size();
         points.push_back(2.0 * points[np - 1] - points[np - 2]);
