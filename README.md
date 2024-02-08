@@ -290,9 +290,15 @@ Source for many of these instructions is Project Chrono documentation. More deta
 
 ## Questions
 
-All questions and suggestions should be directed to the Stackoverflow Teams forum.
+All questions and feature requests (related to this fork of Project Chrono) should be directed to the Discussions at the top of the Repository. Questions related to Project Chrono in general should be directed to their own forum here: https://groups.google.com/g/projectchrono
 
-> #### [Chrono Concrete Forum](https://stackoverflowteams.com/c/concrete-chrono-development)
+> #### [Discussions](https://github.com/Concrete-Chrono-Development/chrono-concrete/discussions)
+
+## Issues and Bugs
+
+All found issues and bugs should be directed to the Issues at the top of the Repository.
+
+> #### [Issues](https://github.com/Concrete-Chrono-Development/chrono-concrete/issues)
 
 ## Wiki, Details, and Examples
 
