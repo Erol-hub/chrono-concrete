@@ -92,6 +92,7 @@ double calculateKE(ChSystem& sys){
 };
 
 
+
 std::shared_ptr<ChBodyAuxRef> CreateBMCrod(ChSystem& sysMBS, std::shared_ptr<ChVisualSystemIrrlicht>& vis, std::shared_ptr<ChBody> ground, std::string current_dir) {
     std::string bmcRod_obj = (current_dir+"/bmcRod.obj").c_str();
     
@@ -161,15 +162,12 @@ std::shared_ptr<ChBodyAuxRef> CreateBMCrod(ChSystem& sysMBS, std::shared_ptr<ChV
     bmcRod->SetInertia(principal_I*density_steel);
     std::cout << " principal_I : " << bmcRod->GetInertia() << " mass : " << bmcRod->GetMass() << std::endl;
    
-       
-    // Connect the bmcShaft to the bmcApparatus through a vertical translational joint.
-    /*auto prismatic2 = chrono_types::make_shared<ChLinkLockPrismatic>();
-    prismatic2->Initialize(bmcRod, ground, ChCoordsys<>(bmcRod->GetPos(), QUNIT));
-    prismatic2->SetName("prismatic_bmcShaft_bmcApparatus");
-    sysMBS.AddLink(prismatic2);*/
+      
     
     return bmcRod;
 }
+
+
 
 std::shared_ptr<ChBody> AddBMCContainer(ChSystem& sys, std::shared_ptr<ChMaterialSurface> mat, double density, std::string current_dir) {
     // create container 
@@ -193,6 +191,7 @@ std::shared_ptr<ChBody> AddBMCContainer(ChSystem& sys, std::shared_ptr<ChMateria
     return container;	
 	
 }
+
 
 std::shared_ptr<ChBody> AddBMCRod(ChSystem& sys, std::shared_ptr<ChMaterialSurface> mat, double density, std::string current_dir) {
     // create container 
@@ -343,6 +342,7 @@ void WritebmcSolidVTK(const std::string& filename,
     outf.close();
 }
 
+
 void AddFallingItems(ChSystem& sys, std::shared_ptr<ChVisualSystemIrrlicht>& vis, std::string& data_path, std::string& file_name, double h_layer, double rho) {
     // Shared contact material for falling objects
     auto mat = chrono_types::make_shared<ChMaterialSurfaceSMC>();
@@ -350,24 +350,18 @@ void AddFallingItems(ChSystem& sys, std::shared_ptr<ChVisualSystemIrrlicht>& vis
     mat->SetFriction(0.5);
     mat->SetRestitution(0.0f);
     mat->SetAdhesion(0);
- 	
+
+	
 	std::vector<chrono::ChVector<float>> body_points;
     std::vector<chrono::ChVector<float>> body_points_new;
 	
-	/*
-	auto mydistribution=chrono_types::make_shared<ChConcreteDistribution>(minD, maxD, cement, AtoC, WtoC, h_layer);    
-    utils::PDSampler<float> sampler(maxD*2+h_layer/2*0);
-    //chrono::utils::HCPSampler<float> HCPsampler(spacing);
-    ChVector<float> sampler_center(0.0f, 70.0f, 0.0f);
-    //body_points = sampler.SampleCylinderY(sampler_center, box_Y/2-1.5*radius1, cyl_rad-1.5*radius1);
-	body_points = sampler.SampleBox(sampler_center, ChVector<>(35,100,35));
-	*/
 	
 	std::string nodesFilename=data_path+file_name+"_coords.dat";
 	std::ifstream nodesFile(nodesFilename);   
 	//
 	// Read COG coordinate of bodies
-	//	
+	//
+	
     if (nodesFile.is_open()) {
        	chrono::ChVector<> pos;
        	double x, y, z;       	
@@ -386,7 +380,8 @@ void AddFallingItems(ChSystem& sys, std::shared_ptr<ChVisualSystemIrrlicht>& vis
     else{
     	throw chrono::ChException("ERROR opening nodes info file: " + std::string(nodesFilename) + "\n");
     	exit(EXIT_FAILURE);
-    }	
+    }
+	
 	//
 	// Read radius info:
 	//
@@ -411,7 +406,8 @@ void AddFallingItems(ChSystem& sys, std::shared_ptr<ChVisualSystemIrrlicht>& vis
     	throw chrono::ChException("ERROR opening nodes info file: " + std::string(nodesFilename) + "\n");
     	exit(EXIT_FAILURE);
     }
-		
+	
+	
     auto numSpheres = body_points.size();
     //std::cout<<"numSpheres: "<<numSpheres<<std::endl;
     body_points_new.resize(numSpheres);
@@ -461,7 +457,7 @@ void AddFallingItems(ChSystem& sys, std::shared_ptr<ChVisualSystemIrrlicht>& vis
 	body->AddVisualShape(sphereAgg);
 	vis->BindItem(body);	
     sys.AddBody(body);
-	  
+    
        
     }
 }
@@ -509,6 +505,7 @@ int main(int argc, char* argv[]) {
     floorBody->SetPos(ChVector<>(0, -5, 0));
     floorBody->SetBodyFixed(true);
     sys.Add(floorBody);
+	
 	//
 	double density=7.8E-9;
 	auto bmcContainer =AddBMCContainer(sys, floor_mat, density, current_dir);
@@ -525,6 +522,7 @@ int main(int argc, char* argv[]) {
 	bmcLid->SetCollide(false);
 	//
 	//
+
 	auto bmcRod =CreateBMCrod(sys, vis, floorBody, current_dir);
 	bmcRod->SetPos(ChVector<>(0,-35,0));
 	/*auto constr_Rod=chrono_types::make_shared<ChLinkMateGeneric>(true, true, true, true, false, true);
@@ -544,7 +542,7 @@ int main(int argc, char* argv[]) {
 	double specimenVol=40.*40.*250.;
 	double Vol=specimenVol*2.;
 	// Concrete properties
-	double h_layer=2;
+	double h_layer=2.5;
 	double minD=2;
     double maxD=4;
 	double cement=845;
@@ -569,17 +567,157 @@ int main(int argc, char* argv[]) {
 	// Define material parameters of fresh concrete
 	//
 	float mortar_layer=h_layer;  /// 1st param --> 0.75 / 1 / 1.10 / 1.20 / 1.40 
-	float ENm=1.5E-2;     /// 2nd param --> 0.25 / 0.50 / 1 / 2 / 4
+	float ENm=7.5E-3;     /// 2nd param --> 0.25 / 0.50 / 1 / 2 / 4
 	float ENa=100.0*0.001;
 	float h=mortar_layer;		
 	float alpha=0.25;
 	float beta=0.5;
 	float np=1.0;
-	float sgmTmax=5.0E-4;  ///3rd param 0.25 / 0.50 / 1 / 2 / 4 
+	float sgmTmax=3.0E-4;  ///3rd param 0.25 / 0.50 / 1 / 2 / 4 
 	float sgmTau0=2.0E-5;  ///4th param 0.25 / 0.50 / 1 / 2 / 4  
 	float kappa0=100.;
-	float eta_inf=10.0E-6;/// 5th param 0.25 / 0.50 / 1 / 2 / 4 
+	float eta_inf=12.5E-6;/// 5th param 0.25 / 0.50 / 1 / 2 / 4 
+	//
+	//
+    //
+    //	Change default contact force algorithm to fresh concrete ones
+	//
+	
+    auto Contact_force_algorithm = chrono_types::make_unique<MyContactForce>();
+	auto materialFCM=chrono_types::make_shared<ChMaterialFCM>(ENm, ENa, mortar_layer, 
+									alpha, beta, np, sgmTmax, sgmTau0, kappa0, eta_inf);
+	materialFCM->Set_FlocOnFlag(true);
+	Contact_force_algorithm->Set_Material(materialFCM);
+    sys.SetContactForceAlgorithm(std::move(Contact_force_algorithm));
+    //
+    auto container = chrono_types::make_shared<MyContactContainer>();
+    sys.SetContactContainer(container);	
+	//
+	//
+	//
+	//
+	//
+	double h_thick=0;
+    std::string data_path=current_dir;
+	std::string file_name="bmc_particle_New4";	
+	AddFallingItems(sys, vis, data_path, file_name, h_layer, rho*0.7051*0.966);
+	//ReadParticles(sys, vis, data_path, file_name, h_thick, rho/2);	
+	//	
+	//
+    // Create an emitter:
 
+    ChParticleEmitter_SMC emitter;
+
+    // Ok, that object will take care of generating particle flows for you.
+    // It accepts a lot of settings, for creating many different types of particle
+    // flows, like fountains, outlets of various shapes etc.
+    // For instance, set the flow rate, etc:
+
+    emitter.ParticlesPerSecond() = 40000;
+
+    emitter.SetUseParticleReservoir(true);
+    emitter.ParticleReservoirAmount() = 40000;
+	
+	emitter.SetUseAgregateVolReservoir(true);
+	emitter.SetMortarLayerThickness(mortar_layer);
+    emitter.AggregateVolReservoirAmount() = targetVol;
+
+    // Our ChParticleEmitter object, among the main settings, it requires
+    // that you give him four 'randomizer' objects: one is in charge of
+    // generating random shapes, one is in charge of generating
+    // random positions, one for random alignments, and one for random velocities.
+    // In the following we need to instance such objects. (There are many ready-to-use
+    // randomizer objects already available in chrono, but note that you could also
+    // inherit your own class from these randomizers if the choice is not enough).
+
+    // ---Initialize the randomizer for positions
+    auto emitter_positions = chrono_types::make_shared<ChRandomParticlePositionRectangleOutlet>();
+    emitter_positions->Outlet() =
+        ChCoordsys<>(ChVector<>(0, 80, 0), Q_from_AngAxis(CH_C_PI_2, VECT_X));  // center and alignment of the outlet
+    emitter_positions->OutletWidth() = 60;
+    emitter_positions->OutletHeight() = 60;
+    emitter.SetParticlePositioner(emitter_positions);
+
+    // ---Initialize the randomizer for alignments
+    auto emitter_rotations = chrono_types::make_shared<ChRandomParticleAlignmentUniform>();
+    emitter.SetParticleAligner(emitter_rotations);
+
+    // ---Initialize the randomizer for velocities, with statistical distribution
+    auto mvelo = chrono_types::make_shared<ChRandomParticleVelocityConstantDirection>();
+    mvelo->SetDirection(-VECT_Y);
+    mvelo->SetModulusDistribution(2000.0);
+
+    emitter.SetParticleVelocity(mvelo);
+
+    // ---Initialize the randomizer for creations, with statistical distribution
+
+   auto mcreator_spheres = chrono_types::make_shared<ChRandomShapeCreatorSpheres>();
+	mcreator_spheres->SetDiameterDistribution(chrono_types::make_shared<ChConcreteDistribution>(minD, maxD, cement, AtoC, WtoC, mortar_layer));
+	mcreator_spheres->SetDensityDistribution(chrono_types::make_shared<ChConstantDistribution>(rho));	
+	// Create material for sphere body
+    auto sphere_mat = chrono_types::make_shared<ChMaterialSurfaceSMC>();
+	sphere_mat->SetYoungModulus(1e2); //2e3
+    sphere_mat->SetFriction(0.5);
+    sphere_mat->SetRestitution(0.0f);
+    sphere_mat->SetAdhesion(0.2);
+	//
+	mcreator_spheres->SetMaterial(sphere_mat);
+    // Optional: define a callback to be exectuted at each creation of a box particle:
+    class MyCreator_spheres : public ChRandomShapeCreator::AddBodyCallback {
+        // Here do custom stuff on the just-created particle:
+      public:
+        virtual void OnAddBody(std::shared_ptr<ChBody> mbody,
+                               ChCoordsys<> mcoords,
+                               ChRandomShapeCreator& mcreator) override {
+            mbody->GetVisualShape(0)->SetColor(ChColor(255./255.,127./255.,80./255.));
+			mbody->GetVisualShape(0)->SetOpacity(0.4f);
+			//mbody->SetBodyFixed(true);
+			auto radius=mbody->GetCollisionModel()->GetShapeDimensions(0)[0];			
+			auto sphereAgg = chrono_types::make_shared<ChSphereShape>(radius-2);
+			//sphereAgg->SetTexture(GetChronoDataFile("textures/pink.png"));
+			sphereAgg->SetColor(ChColor(0.f, 0.f, 0.5f));	
+			mbody->AddVisualShape(sphereAgg);
+        }
+    };
+    auto callback_spheres = chrono_types::make_shared<MyCreator_spheres>();
+    mcreator_spheres->RegisterAddBodyCallback(callback_spheres);
+	
+    // Finally, tell to the emitter that it must use the 'mixer' above:
+    emitter.SetParticleCreator(mcreator_spheres);
+	
+    // --- Optional: what to do by default on ALL newly created particles?
+    //     A callback executed at each particle creation can be attached to the emitter.
+    //     For example, we need that new particles will be bound to Irrlicht visualization:
+
+    // a- define a class that implement your custom OnAddBody method...
+    class MyCreatorForAll : public ChRandomShapeCreator::AddBodyCallback {
+      public:
+        virtual void OnAddBody(std::shared_ptr<ChBody> mbody,
+                               ChCoordsys<> mcoords,
+                               ChRandomShapeCreator& mcreator) override {
+            // Enable Irrlicht visualization for all particles
+            vis->BindItem(mbody);
+            mbody->SetLimitSpeed(true);
+	    mbody->SetMaxSpeed(2000.);
+	    mbody->SetMaxWvel(2000.);
+            // Other stuff, ex. disable gyroscopic forces for increased integrator stabilty
+            //mbody->SetNoGyroTorque(true);
+        }
+        ChVisualSystemIrrlicht* vis;
+    };
+    // b- create the callback object...
+    auto mcreation_callback = chrono_types::make_shared<MyCreatorForAll>();
+    // c- set callback own data that he might need...
+    mcreation_callback->vis = vis.get();
+    // d- attach the callback to the emitter!
+    emitter.RegisterAddBodyCallback(mcreation_callback);
+
+    ChParticleRemoverBox remover;
+    remover.SetRemoveOutside(true);
+    remover.SetBox(ChVector<>(110, 200, 110), ChFrame<>());
+	//
+    //vis->AttachSystem(&sys);
+	//
 	//
 	// Save bmcRod mesh 
     //
@@ -623,16 +761,16 @@ int main(int argc, char* argv[]) {
 	//
 	//
 	char filename[200];
-	const std::string out_dir = current_dir + "/OUT_bmc_h2p_E1p5e-2_S5e-4_T2e-5_V1e-5/";
+	const std::string out_dir = current_dir + "/OUT_bmc_h2p5_E7p5e-3_S3e-4_T2e-5_V1p25e-5/";
 	// Create oputput directories
     if (!filesystem::create_directory(filesystem::path(out_dir))) {
         std::cerr << "Error creating directory " << out_dir << std::endl;
         return 1;
     }   
 	
-	 //
+	//
     FILE *fptr ;
-    auto outfilename=out_dir+"history.txt";
+    auto outfilename=out_dir+"history_bmc_h2p5_E7p5e-3_S3e-4_T2e-5_V1p25e-5.txt";
     fptr= fopen(outfilename.c_str(), "w");
     fprintf(fptr,"time\t");
     fprintf(fptr,"x\t y\t z\t");
@@ -723,6 +861,7 @@ int main(int argc, char* argv[]) {
 		//body->SetMaxSpeed(2000.);
 		//body->SetMaxWvel(2000.);				
 	}
+	
 	
 	//
     // Rotating loop
